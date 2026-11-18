@@ -1,0 +1,40 @@
+import { expect, it } from 'vitest';
+import { emptyProject } from '../core/project';
+import { makeLayer } from '../core/layers';
+import { applyPreset, applyTemplate, presetDefaults, presets, staggerRanks, type PresetId } from './presets';
+import { cameraId, evaluate, isSeamless } from './timeline';
+
+const layer = makeLayer('Triangle', [{ outer: [[0, 0], [1, 0], [0, 1]], holes: [] }], '#808080');
+
+it('turns every catalog entry into editable finite keys', () => {
+  for (const id of Object.keys(presets) as PresetId[]) {
+    const result = applyPreset({ ...emptyProject, layers: [layer] }, id, [layer.id], 0, presetDefaults);
+    const tracks = result.timeline?.tracks ?? [];
+    expect(tracks.length, id).toBeGreaterThan(0);
+    expect(tracks[0].target).toBe(id === 'orbit' ? cameraId : layer.id);
+    expect(tracks.every(({ keys }) => keys.every(({ time, value }) => Number.isFinite(time) &&
+      (typeof value === 'number' ? Number.isFinite(value) : Array.isArray(value) ? value.every(Number.isFinite) : /^#[a-f0-9]{6}$/i.test(value))))).toBe(true);
+  }
+});
+
+it('bakes deterministic spring, keeps lock respected and staggers outer layers after the center', () => {
+  const ids = ['first', 'middle', 'last'];
+  const layers = ids.map((id) => ({ ...layer, id, locked: id === 'last' }));
+  const project = { ...emptyProject, layers };
+  const options = { ...presetDefaults, stagger: 0.2, order: 'center' as const };
+  const a = applyPreset(project, 'spring', ids, 0, options);
+  expect(a).toEqual(applyPreset(project, 'spring', ids, 0, options));
+  expect(a.timeline?.tracks).toHaveLength(2);
+  expect(a.timeline?.tracks[1].keys[0].time).toBeCloseTo(0.2);
+  expect(a.timeline?.tracks[0].keys.length).toBeGreaterThan(20);
+  expect(staggerRanks(ids, 'center').get('middle')).toBe(0);
+  expect(staggerRanks(ids, 'random')).toEqual(staggerRanks(ids, 'random'));
+});
+
+it('creates a seamless loader template using real material and keyframes', () => {
+  const result = applyTemplate({ ...emptyProject, layers: [layer] }, 'loader', [layer.id], presetDefaults);
+  expect(result.layers[0].material).toBe('metal');
+  expect(result.timeline?.loop).toBe('loop');
+  expect(isSeamless(result)).toBe(true);
+  expect(evaluate(result, 0.5).layers[0].rotation).not.toEqual(layer.rotation);
+});

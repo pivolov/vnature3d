@@ -1,6 +1,6 @@
-import { ChevronDown, Copy, Eye, EyeOff, Folder, FolderPlus, GripVertical, Lock, Pencil, Trash2, Unlock } from 'lucide-react';
-import { useState, type DragEvent } from 'react';
-import { childrenOf, deleteNode, duplicateNode, moveNode, treeItems, updateNode } from '../core/layers';
+import { ChevronDown, ChevronLeft, ChevronRight, Copy, Eye, EyeOff, Folder, FolderPlus, GripVertical, Lock, Pencil, Trash2, Unlock } from 'lucide-react';
+import { memo, useLayoutEffect, useRef, useState, type DragEvent } from 'react';
+import { childrenOf, deleteNode, duplicateNode, moveNode, treeItems, updateNode, type TreeItem } from '../core/layers';
 import type { Project } from '../core/project';
 
 type Props = {
@@ -12,10 +12,19 @@ type Props = {
 
 const dragType = 'application/x-logo-studio-layer';
 
-export function LayerTree({ project, selectedId, change, select }: Props) {
+export const LayerTree = memo(function LayerTree({ project, selectedId, change, select }: Props) {
   const [collapsed, setCollapsed] = useState(new Set<string>());
   const [rename, setRename] = useState<string | null>(null);
   const [dropId, setDropId] = useState<string | null>(null);
+  const list = useRef<HTMLDivElement>(null);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(6);
+  useLayoutEffect(() => {
+    if (!list.current) return;
+    const observer = new ResizeObserver(([entry]) => setPageSize(Math.max(1, Math.floor((entry.contentRect.height - 3) / 39))));
+    observer.observe(list.current);
+    return () => observer.disconnect();
+  }, []);
   const selected = treeItems(project).find(({ node }) => node.id === selectedId);
 
   function group() {
@@ -46,14 +55,23 @@ export function LayerTree({ project, selectedId, change, select }: Props) {
     if (parentId) setCollapsed((previous) => new Set([...previous].filter((entry) => entry !== parentId)));
   }
 
-  function rows(parentId?: string, depth = 0) {
-    return childrenOf(project, parentId).map(({ node, kind }) => <div key={node.id}>
+  function flatten(parentId?: string, depth = 0): Array<TreeItem & { depth: number }> {
+    return childrenOf(project, parentId).flatMap((item) => [
+      { ...item, depth }, ...(item.kind === 'group' && !collapsed.has(item.node.id) ? flatten(item.node.id, depth + 1) : []),
+    ]);
+  }
+  const entries = flatten();
+  const pages = Math.max(1, Math.ceil(entries.length / pageSize));
+  const currentPage = Math.min(page, pages - 1);
+
+  function rows() {
+    return entries.slice(currentPage * pageSize, (currentPage + 1) * pageSize).map(({ node, kind, depth }) => <div key={node.id}>
       <div className={'layer tree-row' + (selectedId === node.id ? ' selected' : '') + (dropId === node.id ? ' drag-over' : '')}
         style={{ paddingInlineStart: Math.min(depth, 6) * 10 }}
         onDragOver={(event) => allowDrop(event, node.id)}
         onDrop={(event) => {
           if (kind === 'group' && !event.shiftKey) drop(event, node.id);
-          else drop(event, parentId, node.id);
+          else drop(event, node.parentId, node.id);
         }}>
         <span className="drag-grip" draggable title="Перетащите для перемещения. Shift — поставить перед группой."
           onDragStart={(event) => {
@@ -90,7 +108,6 @@ export function LayerTree({ project, selectedId, change, select }: Props) {
           {node.visible ? <Eye size={14} /> : <EyeOff size={14} />}
         </button>
       </div>
-      {kind === 'group' && !collapsed.has(node.id) && rows(node.id, depth + 1)}
     </div>);
   }
 
@@ -110,10 +127,17 @@ export function LayerTree({ project, selectedId, change, select }: Props) {
         aria-label={selected?.kind === 'group' ? 'Разгруппировать' : 'Удалить слой'} disabled={!selected}
         onClick={() => { if (selected) change((current) => deleteNode(current, selected.node.id)); }}><Trash2 size={14} /></button>
     </div>
-    <div className="layer-list" onDragOver={(event) => allowDrop(event, '')} onDrop={(event) => drop(event)}>
+    <div ref={list} className="layer-list tree-list" onDragOver={(event) => allowDrop(event, '')} onDrop={(event) => drop(event)}>
       {rows()}
       {!project.layers.length && !project.groups?.length && <p className="muted-empty">Импортируйте изображение или добавьте фигуру.</p>}
+    </div>
+    <div className="layer-page" onDragOver={(event) => allowDrop(event, '')} onDrop={(event) => drop(event)}>
       {dropId !== null && <div className={'tree-root-drop' + (!dropId ? ' drag-over' : '')}>В корень</div>}
+      <button className="tree-icon" aria-label="Предыдущая страница слоёв" disabled={currentPage === 0}
+        onClick={() => setPage(currentPage - 1)}><ChevronLeft size={14} /></button>
+      <output>{currentPage + 1} / {pages}</output>
+      <button className="tree-icon" aria-label="Следующая страница слоёв" disabled={currentPage >= pages - 1}
+        onClick={() => setPage(currentPage + 1)}><ChevronRight size={14} /></button>
     </div>
   </>;
-}
+});

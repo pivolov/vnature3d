@@ -45,3 +45,9 @@ describe('SVG import', () => {
     expect(() => importSvg('<svg xmlns="http://www.w3.org/2000/svg"/>')).toThrow('нет замкнутых контуров');
   });
 });
+
+it('imports SVG larger than one megabyte when its geometry is within limits', () => {
+  const data = '<svg xmlns="http://www.w3.org/2000/svg"><!--' + ' '.repeat(1_100_000) +
+    '--><rect width="30" height="20"/></svg>';
+  expect(importSvg(data).layers).toHaveLength(1);
+});

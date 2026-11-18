@@ -2,16 +2,19 @@ import {
   Aperture, ArrowDownToLine, ChevronDown, FilePlus2, FolderOpen, Grid2X2, Layers3, SlidersHorizontal, Save, Video,
   Move, Orbit, Redo2, Undo2, Upload, X,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { Timeline } from './Timeline';
+import { PresetLibrary, type PresetSelection } from './PresetLibrary';
+import { applyPreset, applyTemplate, presets, templates, type PresetOptions } from '../animation/presets';
 import { baseValue, cameraId, defaultTimeline, evaluate, frameTime, positionAt, putKey, type Property, type TimelineData } from '../animation/timeline';
 import { downloadProject, readProject, saveProject, validateProject } from '../core/storage';
 import { createEditor } from '../core/editor';
-import { effectiveLayer } from '../core/layers';
+import { effectiveLayer, isDescendant, makeLayer } from '../core/layers';
 import { LayerTree } from './LayerTree';
 import { PrimitiveEditor } from './PrimitiveEditor';
 import { decodeRaster, RasterDialog, type RasterSource } from './RasterDialog';
 import { cameraPositions, emptyProject, materials, type CameraPreset, type Layer, type LightPreset, type Project, type Vec3 } from '../core/project';
+import { primitiveShape } from '../geometry/primitives';
 import { demos } from '../geometry/demos';
 import { importSvg, maxSvgBytes } from '../geometry/svg';
 import { mountViewport } from '../render/viewport';
@@ -20,11 +23,11 @@ const useEditor = createEditor({ ...emptyProject, ...importSvg(demos[0].svg), na
 const angles = { studio: '3/4', front: 'Спереди', top: 'Сверху', iso: 'Изометрия' } as const;
 const lights = { studio: 'Студия', soft: 'Мягкий', dramatic: 'Драматичный', neon: 'Неон' } as const;
 
-function IconButton({ label, children, onClick, disabled, pressed }: {
-  label: string; children: ReactNode; onClick: () => void; disabled?: boolean; pressed?: boolean;
+function IconButton({ label, children, onClick, disabled, pressed, text }: {
+  label: string; children: ReactNode; onClick: () => void; disabled?: boolean; pressed?: boolean; text?: string;
 }) {
-  return <button className="icon-button" type="button" title={label} aria-label={label} aria-pressed={pressed}
-    disabled={disabled} onClick={onClick}>{children}</button>;
+  return <button className={'icon-button' + (text ? ' file-action' : '')} type="button" title={label} aria-label={label} aria-pressed={pressed}
+    disabled={disabled} onClick={onClick}>{children}{text && <span>{text}</span>}</button>;
 }
 
 function NumberField({ label, value, min, max, step = 0.01, onCommit }: {
@@ -115,17 +118,23 @@ export function App() {
   const [play, setPlay] = useState(0);
   const [autoKey, setAutoKey] = useState(false);
   const [cameraTrack, setCameraTrack] = useState(false);
-  const [side, setSide] = useState<'layers' | 'create'>('layers');
+  const [side, setSide] = useState<'layers' | 'create' | 'presets'>('layers');
   const [mobilePanel, setMobilePanel] = useState<'tools' | 'inspector' | null>(null);
   const [restored, setRestored] = useState(false);
   const [storageStatus, setStorageStatus] = useState('');
+  const [preview, setPreview] = useState<{ project: Project; label: string; duration: number } | null>(null);
+  const [previewTime, setPreviewTime] = useState(0);
   const timeRef = useRef(0);
   const resumeTime = useRef(0);
   const sceneTimeline = project.timeline ?? defaultTimeline;
   const pose = useMemo(() => evaluate(project, time), [project, time]);
+  const previewPose = useMemo(() => preview && evaluate(preview.project, previewTime), [preview, previewTime]);
+  const effectiveLayers = useMemo(() => project.layers.map((layer) => effectiveLayer(project, layer)), [project]);
+  const activeLayers = effectiveLayers.filter((layer) => layer.visible && !layer.locked);
+  const canAnimateSelected = activeLayers.some(({ id }) => id === selectedId || !!selectedId && isDescendant(project, id, selectedId));
+  const selectLayer = useCallback((id: string) => { setCameraTrack(false); select(id); }, [select]);
   const selectedSource = pose.layers.find((layer) => layer.id === selectedId);
   const selected = selectedSource && effectiveLayer(pose, selectedSource);
-  const effectiveLayers = project.layers.map((layer) => effectiveLayer(project, layer));
   const fileField = useRef<HTMLInputElement>(null);
   const projectField = useRef<HTMLInputElement>(null);
   const actions = useRef<{ layer: (id: string, patch: Partial<Layer>) => void; camera: (patch: Partial<Project['camera']>) => void } | null>(null);
@@ -148,6 +157,7 @@ export function App() {
     setTime(next);
   }
   function playback(speed: number) {
+    if (speed) setPreview(null);
     if (!play && speed === 1 && timeRef.current >= sceneTimeline.duration) seek(0);
     if (!play && speed === -1 && timeRef.current <= 0) seek(sceneTimeline.duration);
     setPlay(speed);
@@ -186,7 +196,7 @@ export function App() {
     });
   }
   function editCamera(patch: Partial<Project['camera']>) {
-    if (play) return;
+    if (play || preview) return;
     change((current) => {
       const animated = Object.fromEntries(Object.entries(patch).filter(([field]) => baseValue(current, cameraId, field as Property) !== undefined &&
         (autoKey || current.timeline?.tracks.some((track) => track.target === cameraId && track.property === field))));
@@ -216,6 +226,18 @@ export function App() {
     }, 250);
     return () => clearTimeout(timer);
   }, [project, restored]);
+  useEffect(() => {
+    if (!preview) return;
+    const start = performance.now();
+    let frame = 0;
+    function run(now: number) {
+      if (!preview) return;
+      setPreviewTime(positionAt((now - start) / 1000, preview.duration, 'loop'));
+      frame = requestAnimationFrame(run);
+    }
+    frame = requestAnimationFrame(run);
+    return () => cancelAnimationFrame(frame);
+  }, [preview]);
   useEffect(() => {
     if (!play) return;
     const duration = sceneTimeline.duration;
@@ -257,8 +279,8 @@ export function App() {
   }, [select]);
 
   useEffect(() => {
-    viewport.current?.update(pose, selectedId, grid, gizmo && !play);
-  }, [pose, selectedId, grid, gizmo, play]);
+    viewport.current?.update(previewPose || pose, selectedId, grid, gizmo && !play && !previewPose);
+  }, [pose, previewPose, selectedId, grid, gizmo, play]);
 
   useEffect(() => {
     function shortcuts(event: KeyboardEvent) {
@@ -275,7 +297,36 @@ export function App() {
     return () => window.removeEventListener('keydown', shortcuts);
   }, [redo, undo]);
 
-  function resetTime() { setPlay(0); seek(0); setCameraTrack(false); }
+  function resetTime() { setPlay(0); seek(0); setCameraTrack(false); setPreview(null); }
+  function applyMotion(current: Project, selection: PresetSelection, options: PresetOptions, all: boolean, start: number) {
+    let composition = current;
+    const allowed = current.layers.filter((layer) => {
+      const active = effectiveLayer(current, layer);
+      return active.visible && !active.locked && (all || layer.id === selectedId || !!selectedId && isDescendant(current, layer.id, selectedId));
+    });
+    let ids = allowed.map(({ id }) => id);
+    if (selection.type === 'template' && !ids.length && !current.layers.length) {
+      const shape = selection.id === 'success'
+        ? { outer: [[-1.25, 0], [-0.92, 0.32], [-0.35, -0.22], [0.89, 0.96], [1.22, 0.62], [-0.35, -0.87]] as [number, number][], holes: [] }
+        : selection.id === 'loader' ? primitiveShape('polygon', 6) : primitiveShape('star', 4);
+      if (selection.id === 'loader') shape.holes = [shape.outer.map(([x, y]) => [x * 0.65, y * 0.65])];
+      const layer = makeLayer(templates[selection.id].label, [shape], '#d6f494');
+      composition = { ...current, name: templates[selection.id].label, layers: [layer] };
+      ids = [layer.id];
+    }
+    if (selection.type === 'template') return ids.length ? applyTemplate(composition, selection.id, ids, options) : current;
+    return applyPreset(composition, selection.id, ids, start, options);
+  }
+  function showMotion(request: { selection: PresetSelection; options: PresetOptions; all: boolean } | null) {
+    if (!request) { setPreview(null); return; }
+    const { selection, options, all } = request;
+    const base = { ...project, timeline: { ...defaultTimeline, fps: sceneTimeline.fps, duration: 0.1 } };
+    const temporary = applyMotion(base, selection, options, all, 0);
+    if (temporary === base) return;
+    setPreviewTime(0);
+    setPreview({ project: temporary, duration: temporary.timeline?.duration ?? options.duration,
+      label: selection.type === 'preset' ? presets[selection.id].label : templates[selection.id].label });
+  }
   async function openProject(file: File) {
     const request = ++importSequence.current;
     try {
@@ -358,8 +409,8 @@ export function App() {
       <img className="brand-logo" src={import.meta.env.BASE_URL + 'VD3D.svg'} alt="VD3D" />
       <div className="topbar-actions">
         <IconButton label="Новый проект" onClick={newProject}><FilePlus2 size={17} /></IconButton>
-        <IconButton label="Открыть проект" onClick={() => projectField.current?.click()}><FolderOpen size={17} /></IconButton>
-        <IconButton label="Скачать проект" onClick={() => downloadProject(project)}><Save size={17} /></IconButton>
+        <IconButton label="Открыть проект" text="Открыть" onClick={() => projectField.current?.click()}><FolderOpen size={17} /></IconButton>
+        <IconButton label="Скачать проект" text="Скачать .l3d" onClick={() => downloadProject(project)}><Save size={17} /></IconButton>
         <span className="divider" />
         <IconButton label="Отменить" disabled={!past.length} onClick={undo}><Undo2 size={17} /></IconButton>
         <IconButton label="Повторить" disabled={!future.length} onClick={redo}><Redo2 size={17} /></IconButton>
@@ -384,12 +435,23 @@ export function App() {
     <div className="workspace">
       <aside className="sidebar" aria-label="Слои и примеры">
         <div className="panel-tabs" aria-label="Инструменты">
-          <button aria-pressed={side === 'layers'} onClick={() => setSide('layers')}>Слои</button>
-          <button aria-pressed={side === 'create'} onClick={() => setSide('create')}>Фигуры</button>
+          <button aria-pressed={side === 'layers'} onClick={() => { setSide('layers'); setPreview(null); }}>Слои</button>
+          <button aria-pressed={side === 'create'} onClick={() => { setSide('create'); setPreview(null); }}>Фигуры</button>
+          <button aria-pressed={side === 'presets'} onClick={() => setSide('presets')}>Пресеты</button>
         </div>
-        <div className="settings-scroll side-content">
+        <div className={side === 'layers' ? 'side-content layer-content' : 'settings-scroll side-content'}>
         {side === 'layers' && <LayerTree project={project} selectedId={selectedId} change={change}
-          select={(id) => { setCameraTrack(false); select(id); }} />}
+          select={selectLayer} />}
+        {side === 'presets' && <PresetLibrary canAnimate={!!activeLayers.length} canAnimateSelected={canAnimateSelected} preview={showMotion}
+          apply={(selection, options, all) => {
+            const start = selection.type === 'template' ? 0 : time;
+            setPlay(0); setPreview(null);
+            const result = applyMotion(project, selection, options, all, start);
+            if (result === project) { setError('Выберите видимый слой или уменьшите задержку.'); return; }
+            setError(''); change(() => result);
+            setCameraTrack(selection.id === 'orbit');
+            seek(start);
+          }} />}
         {side === 'create' && <><PrimitiveEditor key={project.name} layers={effectiveLayers} selected={selected}
           onAdd={(layer) => {
             setError('');
@@ -419,7 +481,7 @@ export function App() {
 
       <main className="canvas-panel">
         <div className="canvas-header">
-          <div className="document"><h1 title={project.name}>{project.name}</h1></div>
+          <div className="document"><h1 title={project.name}>{project.name}</h1>{preview && <span className="preview-label">Предпросмотр · {preview.label}</span>}</div>
           <div className="canvas-tools">
             <IconButton label="Дорожки камеры" pressed={cameraTrack} onClick={() => setCameraTrack(!cameraTrack)}><Video size={17} /></IconButton>
             <IconButton label="Сетка" pressed={grid} onClick={() => setGrid(!grid)}><Grid2X2 size={17} /></IconButton>
@@ -427,7 +489,7 @@ export function App() {
           </div>
         </div>
         <div className="viewport-host" ref={host} />
-        {!project.layers.length && !graphicsError && <div className="empty-canvas">
+        {!(previewPose || project).layers.length && !graphicsError && <div className="empty-canvas">
           <Upload size={29} />
           <h2>Перетащите SVG, PNG или JPG</h2>
           <button className="secondary" onClick={() => fileField.current?.click()}>Выбрать файл</button>

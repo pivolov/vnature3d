@@ -182,10 +182,16 @@ export function mountViewport(host: HTMLDivElement, callbacks: Callbacks) {
           mesh.geometry.dispose();
           mesh.geometry = extrudeLayer(layer);
         }
-        const { roughness, metalness, clearcoat } = materials[layer.material];
-        mesh.material.setValues({ color: layer.color, emissive: layer.emissive ?? '#000000', roughness: layer.roughness ?? roughness, metalness, clearcoat,
-          side: layer.relief ? DoubleSide : FrontSide, opacity: layer.opacity, transparent: layer.opacity < 1, depthWrite: layer.opacity === 1 });
-        mesh.material.needsUpdate = true;
+        if (!previous || previous.layer.material !== layer.material || previous.layer.color !== layer.color ||
+          previous.layer.emissive !== layer.emissive || previous.layer.roughness !== layer.roughness ||
+          previous.layer.opacity !== layer.opacity || previous.layer.relief !== layer.relief) {
+          const { roughness, metalness, clearcoat } = materials[layer.material];
+          const side = layer.relief ? DoubleSide : FrontSide;
+          const transparent = layer.opacity < 1;
+          if (mesh.material.side !== side || mesh.material.transparent !== transparent) mesh.material.needsUpdate = true;
+          mesh.material.setValues({ color: layer.color, emissive: layer.emissive ?? '#000000',
+            roughness: layer.roughness ?? roughness, metalness, clearcoat, side, opacity: layer.opacity, transparent, depthWrite: !transparent });
+        }
         mesh.position.set(...layer.position);
         mesh.scale.set(...(layer.scale ?? [1, 1, 1]));
         mesh.rotation.set(...layer.rotation);

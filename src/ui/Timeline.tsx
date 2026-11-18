@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, CirclePlus, Copy, Diamond, Gauge, Pause, Play, SkipBack, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
+import { staggerRanks, type PresetOptions } from '../animation/presets';
 import { ease, families, type Easing } from '../animation/easing';
 import {
   baseValue, cameraFields, cameraId, changeKeys, defaultTimeline, frameTime, isSeamless, layerFields,
@@ -109,6 +110,8 @@ export function Timeline({ project, target, layerName, disabled, time, seek, pla
   const [zoom, setZoom] = useState(1);
   const [origin, setOrigin] = useState(0);
   const [page, setPage] = useState(0);
+  const [stagger, setStagger] = useState(0);
+  const [staggerOrder, setStaggerOrder] = useState<PresetOptions['order']>('forward');
   const [mode, setMode] = useState<'keys' | 'curve' | 'scene'>('keys');
   const clip = useRef<{ property: Property; key: Key } | undefined>(undefined);
   const gesture = useRef<{ pointer: number; source: number; property: Property; start: number; width: number } | undefined>(undefined);
@@ -250,7 +253,7 @@ export function Timeline({ project, target, layerName, disabled, time, seek, pla
               const moving = gesture.current?.property === field && sameTime(gesture.current.source, key.time);
               const percent = ((moving && dragTime !== null ? dragTime : key.time) - start) / span * 100;
               if (!moving && (percent < -0.0001 || percent > 100.0001)) return null;
-              return <button key={key.time} className="timeline-key" type="button" style={{ left: percent + '%' }}
+              return <button key={key.time} className={'timeline-key' + ((tracks.find((item) => item.property === field)?.keys.length ?? 0) > zoom * 28 ? ' dense-key' : '')} type="button" style={{ left: percent + '%' }}
                 aria-label={nameOf(field) + ', ключ ' + key.time.toFixed(2) + ' с'} aria-pressed={keyframe === key}
                 onClick={() => { if (dragTime === null) { setChosen(field); setFocus({ target: target ?? '', property: field, time: key.time }); seek(key.time); } }}
                 onPointerDown={(event) => {
@@ -279,18 +282,25 @@ export function Timeline({ project, target, layerName, disabled, time, seek, pla
             const loop = event.currentTarget.value as TimelineData['loop']; update((current) => ({ ...current, loop }));
           }}><option value="once">Один раз</option><option value="loop">Петля</option><option value="ping-pong">Туда–обратно</option></select></label>
           <span className="timeline-help">{isSeamless(project) ? 'Начало и конец совпадают' : 'Начало и конец различаются'}</span>
-          <label className="timeline-field">Каскад, с<input aria-label="Каскад" type="number" min={0} max={5} step={0.05} defaultValue={0}
-            onBlur={(event) => {
-              const delay = event.currentTarget.valueAsNumber;
-              if (!(delay > 0 && delay <= 5)) return;
-              const order = new Map(project.layers.filter((layer) => data.tracks.some(({ target: identity }) => identity === layer.id)).map((layer, index) => [layer.id, index]));
+          <div className="timeline-stagger">
+            <label className="timeline-field">Каскад {stagger.toFixed(2)} с <input aria-label="Каскад" type="range" min={0} max={5} step={0.05}
+              value={stagger} onChange={(event) => setStagger(event.currentTarget.valueAsNumber)} /></label>
+            <select aria-label="Порядок каскада" value={staggerOrder}
+              onChange={(event) => setStaggerOrder(event.currentTarget.value as PresetOptions['order'])}>
+              <option value="forward">По порядку</option><option value="center">От центра</option><option value="random">Случайно</option>
+            </select>
+            <button type="button" className="text-button" disabled={!stagger || !data.tracks.length} onClick={() => {
+              const ids = project.layers.filter((layer) => data.tracks.some(({ target: identity }) => identity === layer.id))
+                .map(({ id }) => id);
+              const order = staggerRanks(ids, staggerOrder);
               update((current) => {
-                const reordered = current.tracks.map((track) => ({ ...track, keys: track.keys.map((key) => ({ ...key, time: Math.min(120, key.time + delay * (order.get(track.target) ?? 0)) }))
-                  .filter((key, index, keys) => index === keys.length - 1 || key.time !== keys[index + 1].time) }));
-                return { ...current, tracks: reordered, duration: Math.max(current.duration, ...reordered.map((track) => track.keys.at(-1)?.time ?? 0)) };
+                const tracks = current.tracks.map((track) => ({ ...track, keys: track.keys.map((key) => ({
+                  ...key, time: Math.min(120, key.time + stagger * (order.get(track.target) ?? 0)),
+                })).filter((key, index, keys) => index === keys.length - 1 || key.time !== keys[index + 1].time) }));
+                return { ...current, tracks, duration: Math.max(current.duration, ...tracks.map((track) => track.keys.at(-1)?.time ?? 0)) };
               });
-              event.currentTarget.value = '0';
-            }} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} /></label>
+            }}>Сдвинуть</button>
+          </div>
         </div>}
         {mode === 'curve' && <Curve track={track} keyframe={keyframe} update={setKey} />}
         {mode === 'keys' && <div className="timeline-settings">
