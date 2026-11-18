@@ -2,7 +2,7 @@ import { Box2, Color, Vector2 } from 'three';
 import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
 import type { Layer, Shape, Vec2 } from '../core/project';
 
-export const maxSvgBytes = 1024 * 1024;
+export const maxSvgBytes = 16 * 1024 * 1024;
 
 type Paint = { fill?: string; stroke?: string; fillOpacity?: number; opacity?: number; visibility?: string; display?: string };
 type PathData = {
@@ -34,7 +34,7 @@ function moments(points: Vec2[]) {
 }
 
 export function importSvg(source: string): { layers: Layer[]; notices: string[] } {
-  if (new TextEncoder().encode(source).length > maxSvgBytes) throw new Error('SVG превышает 1 МБ. Упростите исходный файл.');
+  if (new TextEncoder().encode(source).length > maxSvgBytes) throw new Error('SVG превышает 16 МБ. Упростите исходный файл.');
   const doc = new DOMParser().parseFromString(source, 'image/svg+xml');
   if (doc.querySelector('parsererror') || doc.documentElement.localName !== 'svg' || doc.doctype) {
     throw new Error('Не удалось прочитать SVG. Проверьте, что файл содержит корректную SVG-разметку.');

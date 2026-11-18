@@ -183,10 +183,11 @@ export function mountViewport(host: HTMLDivElement, callbacks: Callbacks) {
           mesh.geometry = extrudeLayer(layer);
         }
         const { roughness, metalness, clearcoat } = materials[layer.material];
-        mesh.material.setValues({ color: layer.material === 'gold' ? '#eec269' : layer.color, roughness, metalness, clearcoat,
+        mesh.material.setValues({ color: layer.color, emissive: layer.emissive ?? '#000000', roughness: layer.roughness ?? roughness, metalness, clearcoat,
           side: layer.relief ? DoubleSide : FrontSide, opacity: layer.opacity, transparent: layer.opacity < 1, depthWrite: layer.opacity === 1 });
         mesh.material.needsUpdate = true;
         mesh.position.set(...layer.position);
+        mesh.scale.set(...(layer.scale ?? [1, 1, 1]));
         mesh.rotation.set(...layer.rotation);
         mesh.visible = layer.visible;
         meshes.set(layer.id, { layer, mesh });

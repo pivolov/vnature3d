@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { cameraId } from '../animation/timeline';
 import { treeItems } from './layers';
 import { emptyProject, type Layer, type Project } from './project';
 
@@ -10,6 +11,7 @@ type Editor = {
   select: (id: string) => void;
   change: (update: (project: Project) => Project) => void;
   updateLayer: (id: string, patch: Partial<Layer>) => void;
+  restore: (project: Project) => void;
   undo: () => void;
   redo: () => void;
 };
@@ -25,9 +27,15 @@ export function createEditor(project = emptyProject) {
     future: [],
     selectedId: selection(project, null),
     select: (selectedId) => set({ selectedId }),
+    restore: (project) => set({ project, past: [], future: [], selectedId: selection(project, null) }),
     change: (update) => set((state) => {
-      const project = update(state.project);
+      let project = update(state.project);
       if (project === state.project) return state;
+      if (project.layers !== state.project.layers && project.timeline) {
+        const ids = new Set(project.layers.map(({ id }) => id));
+        const tracks = project.timeline.tracks.filter(({ target }) => target === cameraId || ids.has(target));
+        if (tracks.length !== project.timeline.tracks.length) project = { ...project, timeline: { ...project.timeline, tracks } };
+      }
       return { project, past: [...state.past.slice(-29), state.project], future: [], selectedId: selection(project, state.selectedId) };
     }),
     updateLayer: (id, patch) => get().change((project) => ({

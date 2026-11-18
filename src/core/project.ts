@@ -1,3 +1,5 @@
+import type { TimelineData } from '../animation/timeline';
+
 export type Vec2 = [number, number];
 export type Vec3 = [number, number, number];
 
@@ -24,6 +26,9 @@ export type Layer = {
   color: string;
   material: keyof typeof materials;
   opacity: number;
+  scale?: Vec3;
+  emissive?: string;
+  roughness?: number;
   visible: boolean;
   depth: number;
   bevel: number;
@@ -50,6 +55,7 @@ export type Project = {
   layers: Layer[];
   groups?: LayerGroup[];
   notices: string[];
+  timeline?: TimelineData;
   light: LightPreset;
   camera: { preset: CameraPreset; projection: 'perspective' | 'orthographic'; position: Vec3; target: Vec3; zoom: number };
 };

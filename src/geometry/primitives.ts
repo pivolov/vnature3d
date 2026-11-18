@@ -34,8 +34,9 @@ function polygons(layer: Layer): MultiPolygon {
   const sin = Math.sin(angle);
   const cos = Math.cos(angle);
   const [dx, dy] = layer.position;
+  const [sx, sy] = layer.scale ?? [1, 1, 1];
   const ring = (points: Vec2[]): Ring => {
-    const result = points.map(([x, y]): Vec2 => [dx + x * cos - y * sin, dy + x * sin + y * cos]);
+    const result = points.map(([x, y]): Vec2 => [dx + x * sx * cos - y * sy * sin, dy + x * sx * sin + y * sy * cos]);
     return [...result, result[0]];
   };
   const shapes = layer.shapes.map(({ outer, holes }): Polygon => [ring(outer), ...holes.map(ring)]);

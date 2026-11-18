@@ -82,7 +82,7 @@ export function LayerTree({ project, selectedId, change, select }: Props) {
             }
           }} />
           : <button className="layer-label" aria-pressed={selectedId === node.id} onClick={() => select(node.id)} onDoubleClick={() => setRename(node.id)}>
-            {kind === 'group' ? <Folder size={14} /> : <span className="swatch" style={{ backgroundColor: node.material === 'gold' ? '#eec269' : node.color }} />}
+            {kind === 'group' ? <Folder size={14} /> : <span className="swatch" style={{ backgroundColor: node.color }} />}
             <span>{node.name}</span>
           </button>}
         <button className="tree-icon" title={node.visible ? 'Скрыть' : 'Показать'} aria-label={(node.visible ? 'Скрыть ' : 'Показать ') + node.name}
