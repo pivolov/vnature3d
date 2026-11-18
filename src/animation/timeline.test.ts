@@ -3,7 +3,7 @@ import { emptyProject } from '../core/project';
 import { makeLayer } from '../core/layers';
 import { validateProject } from '../core/storage';
 import { ease, spring, families } from './easing';
-import { defaultTimeline, evaluate, frameTime, isSeamless, positionAt, putKey } from './timeline';
+import { defaultTimeline, evaluate, frameTime, isSeamless, positionAt, putKey, resizeTimeline } from './timeline';
 
 describe('easing', () => {
   it('keeps endpoints for every easing family and handles hold and bezier', () => {
@@ -41,4 +41,15 @@ it('round-trips animated projects and keeps flat scene data immutable', () => {
   expect(project.layers[0].rotation[1]).toBe(0);
   expect(isSeamless(project)).toBe(true);
   expect(() => validateProject({ ...project, groups: [{ id: 'g', name: 'Group', visible: true, parentId: 'g' }] })).toThrow('иерархия');
+});
+
+it('loads legacy keys past duration and trims explicitly shortened timelines at their sampled value', () => {
+  const layer = makeLayer('Triangle', [{ outer: [[0, 0], [1, 0], [0, 1]], holes: [] }], '#808080');
+  const timeline = putKey(putKey({ ...defaultTimeline, duration: 1 }, layer.id, 'opacity', {
+    time: 0, value: 0, easing: { kind: 'linear' },
+  }), layer.id, 'opacity', { time: 4, value: 1, easing: { kind: 'linear' } });
+  const restored = validateProject({ ...emptyProject, layers: [layer], timeline });
+  expect(restored.timeline?.duration).toBe(4);
+  const shortened = resizeTimeline(restored.timeline!, 2);
+  expect(shortened.tracks[0].keys.at(-1)).toMatchObject({ time: 2, value: 0.5 });
 });

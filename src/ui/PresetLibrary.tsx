@@ -93,6 +93,7 @@ export function PresetLibrary({ canAnimate, canAnimateSelected, preview, apply }
           <option value="elastic">Упругая</option><option value="linear">Линейная</option>
         </select></label>
     </div></details>
+    <p className="preset-note">При пересечении заменяются ключи тех же свойств в диапазоне пресета.</p>
     <div className="preset-actions">
       <button type="button" className="secondary" disabled={!eligible(active)} onFocus={() => show(active)} onBlur={() => preview(null)}
         onPointerEnter={() => show(active)} onPointerLeave={() => preview(null)} onClick={() => show(active)} title="Предпросмотр">

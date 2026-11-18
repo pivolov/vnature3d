@@ -1,6 +1,7 @@
-import { Quaternion, Vector3 } from 'three';
+import { Color, Quaternion, Vector3 } from 'three';
+import { reduceLinear } from '../utils/reduction';
 import { effectiveLayer } from '../core/layers';
-import { materials, type Layer, type LightPreset, type Project, type Vec3 } from '../core/project';
+import { type Layer, type LightPreset, type Project, type Vec3 } from '../core/project';
 import { ease, spring, type Easing } from './easing';
 import { cameraId, defaultTimeline, evaluate, frameTime, type Key, type Property, type TimelineData, type Track, type Value } from './timeline';
 
@@ -18,7 +19,7 @@ const unit = Math.PI / 180;
 type Samples = [number, number][];
 type Recipe = {
   position?: Samples; radial?: Samples; rotation?: Samples; scale?: Samples; opacity?: Samples;
-  squash?: Samples; roughness?: Samples; glow?: Samples; jitter?: Samples;
+  squash?: Samples; shine?: Samples; glow?: Samples; jitter?: Samples;
   camera?: 'orbit';
 };
 const pulse = (...values: number[]): Samples => values.map((value, i) => [i / (values.length - 1), value]);
@@ -40,7 +41,7 @@ export const presets = {
   breathing: { label: 'Дыхание', group: 'Цикл', recipe: { scale: pulse(1, 1.13, 1) } },
   orbit: { label: 'Орбита камеры', group: 'Цикл', recipe: { camera: 'orbit' } },
   tilt: { label: 'Наклон', group: 'Цикл', recipe: { rotation: pulse(0, -16, 12, 0), position: pulse(0, 0.18, -0.12, 0) } },
-  shine: { label: 'Пробегающий блик', group: 'Цикл', recipe: { roughness: pulse(0, -0.22, 0), rotation: pulse(0, 15, -12, 0) } },
+  shine: { label: 'Пробегающий блик', group: 'Цикл', recipe: { shine: pulse(0, 360) } },
   glow: { label: 'Пульс свечения', group: 'Цикл', recipe: { glow: pulse(0, 0.55, 0) } },
   shake: { label: 'Встряска', group: 'Акцент', recipe: { jitter: pulse(0, 0.32, -0.3, 0.23, -0.19, 0.12, 0) } },
   jelly: { label: 'Желе', group: 'Акцент', recipe: { squash: pulse(1, 0.59, 1.26, 0.9, 1) } },
@@ -56,7 +57,7 @@ export type PresetId = keyof typeof presets;
 export function presetGraph(id: PresetId) {
   const recipe: Recipe = presets[id].recipe;
   const samples = recipe.position ?? recipe.radial ?? recipe.rotation ?? recipe.scale ?? recipe.opacity ??
-    recipe.squash ?? recipe.jitter ?? recipe.roughness ?? recipe.glow ?? pulse(0, 1);
+    recipe.squash ?? recipe.jitter ?? recipe.shine ?? recipe.glow ?? pulse(0, 1);
   const values = Array.from({ length: 33 }, (_, i) => {
     const t = i / 32;
     if (id === 'spring') return spring(t, 16, 0.43);
@@ -151,10 +152,10 @@ export function applyPreset(project: Project, id: PresetId, ids: string[], start
       const balanced = id === 'progress' || id === 'unfold' ? 1 : 1 / Math.sqrt(multiplier);
       return scale.map((value, i) => value * (recipe.scale || i === axis ? multiplier : balanced)) as Vec3;
     });
-    if (recipe.roughness) set('roughness', recipe.roughness, (amount) => Math.max(0, (layer.roughness ?? materials[layer.material].roughness) + amount * strength));
+    if (recipe.shine) set('shine', recipe.shine, (amount) => (layer.shine ?? 0) + amount * unit * sign * strength, linear);
     if (recipe.glow) set('emissive', recipe.glow, (amount) => {
-      const brightness = Math.min(255, Math.round(Math.max(0, amount * strength) * 255));
-      return '#' + brightness.toString(16).padStart(2, '0').repeat(3);
+      const color = new Color(layer.color).multiplyScalar(Math.max(0, Math.min(1, amount * strength)));
+      return '#' + new Color(layer.emissive ?? '#000000').add(color).getHexString();
     });
     if (id === 'spring') {
       const count = Math.min(181, Math.max(5, Math.ceil(options.duration * timeline.fps) + 1));
@@ -162,7 +163,8 @@ export function applyPreset(project: Project, id: PresetId, ids: string[], start
         const t = i / (count - 1);
         return [t, i === count - 1 ? 1 : spring(t, 16, 0.43)];
       });
-      set('scale', samples, (amount) => scale.map((value) => Math.max(0.01, value * (1 + (amount - 1) * 0.48 * strength))) as Vec3, linear);
+      const compact = reduceLinear(samples, ([time]) => time, ([, amount]) => [amount], 0.005 / Math.max(1, strength, ...scale));
+      set('scale', compact, (amount) => scale.map((value) => Math.max(0.01, value * (1 + (amount - 1) * 0.48 * strength))) as Vec3, linear);
     }
   }
   const tracks = new Map(timeline.tracks.map((track) => [track.target + '/' + track.property, track]));

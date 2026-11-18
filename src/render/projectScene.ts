@@ -84,11 +84,14 @@ export function createProjectScene(renderer: WebGLRenderer) {
         }
         if (!previous || previous.layer.material !== layer.material || previous.layer.color !== layer.color ||
           previous.layer.emissive !== layer.emissive || previous.layer.roughness !== layer.roughness ||
-          previous.layer.opacity !== layer.opacity || previous.layer.relief !== layer.relief) {
+          previous.layer.opacity !== layer.opacity || previous.layer.relief !== layer.relief || previous.layer.shine !== layer.shine) {
           const { roughness, metalness, clearcoat } = materials[layer.material];
           const side = layer.relief ? DoubleSide : FrontSide;
           const transparent = layer.opacity < 1;
-          if (mesh.material.side !== side || mesh.material.transparent !== transparent) mesh.material.needsUpdate = true;
+          const map = layer.shine === undefined ? null : environment.texture;
+          if (mesh.material.side !== side || mesh.material.transparent !== transparent || mesh.material.envMap !== map) mesh.material.needsUpdate = true;
+          mesh.material.envMap = map;
+          mesh.material.envMapRotation.set(0.16, layer.shine ?? 0, 0.1);
           mesh.material.setValues({ color: layer.color, emissive: layer.emissive ?? '#000000',
             roughness: layer.roughness ?? roughness, metalness, clearcoat, side, opacity: layer.opacity, transparent, depthWrite: !transparent });
         }

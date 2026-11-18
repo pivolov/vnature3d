@@ -29,6 +29,7 @@ export type Layer = {
   scale?: Vec3;
   emissive?: string;
   roughness?: number;
+  shine?: number;
   visible: boolean;
   depth: number;
   bevel: number;

@@ -435,3 +435,41 @@ button:focus-visible { outline-color: #b8edcf; }
   .canvas-header { padding: 6px; }
   .canvas-tools .icon-button { width: 25px; height: 26px; }
 }
+
+.preset-note { color: var(--muted); font-size: 11px; line-height: 1.4; margin: 0; }
+.lottie-dialog { width: min(720px, calc(100% - 20px)); }
+.lottie-mode-tabs { display: flex; gap: 4px; padding: 7px 16px 0; }
+.lottie-mode-tabs [aria-pressed=true] { color: var(--accent); background: #364b41; cursor: default; }
+.lottie-body { padding: 0 14px 10px; }
+.lottie-body .lottie-mode-tabs { padding-inline: 0; }
+.lottie-options { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; padding: 9px 0; margin: 0; border: 0; min-inline-size: 0; }
+.lottie-options label { display: grid; gap: 4px; color: var(--muted); font-size: 11px; min-width: 0; }
+.lottie-report { display: flex; flex-wrap: wrap; gap: 7px; justify-content: space-between; margin: 4px 0 8px; font-size: 12px; }
+.lottie-report strong { color: var(--accent); }
+.lottie-report span, .lottie-transport > span { color: var(--muted); }
+.lottie-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.lottie-comparison figure { margin: 0; min-width: 0; }
+.lottie-preview-pane { height: clamp(140px, 29vh, 285px); display: grid; place-items: center; overflow: hidden; background: #3a3b3d; border: 1px solid #54575b; border-radius: 7px; }
+.lottie-preview-pane canvas, .lottie-preview-pane svg { display: block; width: 100%; height: 100%; object-fit: contain; }
+.lottie-comparison figcaption { padding: 4px 2px; color: var(--muted); font-size: 11px; }
+.lottie-comparison[data-overlay="difference"] { grid-template-columns: 1fr; isolation: isolate; background: #3a3b3d; border-radius: 7px; }
+.lottie-comparison[data-overlay="difference"] figure { grid-row: 1; grid-column: 1; }
+.lottie-comparison[data-overlay="difference"] figure:first-child figcaption { visibility: hidden; }
+.lottie-comparison[data-overlay="difference"] figure:last-child .lottie-preview-pane { mix-blend-mode: difference; }
+.lottie-transport { display: flex; align-items: center; gap: 6px; font-size: 11px; flex-wrap: wrap; }
+.lottie-transport input[type=range] { flex: 1; min-width: 55px; }
+.lottie-transport input, .lottie-body progress { accent-color: var(--accent); }
+.lottie-warning, .lottie-snippets p { color: #e8d1ab; font-size: 11px; line-height: 1.45; margin: 7px 0; }
+.lottie-snippets { border: 1px solid var(--line); border-radius: 7px; margin-top: 8px; padding: 0 8px; }
+.lottie-snippets summary { min-height: 29px; padding: 0; justify-content: flex-start; gap: 6px; font-size: 11px; }
+.lottie-snippets div { display: flex; gap: 8px; align-items: center; }
+.lottie-snippets pre { max-height: 115px; overflow: auto; background: #18191a; padding: 6px; font-size: 11px; }
+.lottie-loading { position: fixed; inset: 0; z-index: 12; display: grid; place-items: center; background: #171819cc; }
+.lottie-actions { flex-wrap: wrap; }
+@media (max-width: 480px) {
+  .lottie-options { grid-template-columns: repeat(3, 1fr); }
+  .lottie-transport > span { flex-basis: 100%; }
+  .lottie-actions button { font-size: 11px; padding-inline: 5px; }
+}
+.lottie-preview-pane { display: block; position: relative; }
+.lottie-preview-pane canvas, .lottie-preview-pane svg { position: absolute; inset: 0; }

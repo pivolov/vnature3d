@@ -4,7 +4,7 @@ import { ease, type Easing } from './easing';
 
 export const layerFields = {
   position: 'Положение', rotation: 'Поворот', scale: 'Масштаб', opacity: 'Непрозрачность',
-  color: 'Цвет', emissive: 'Свечение', roughness: 'Шероховатость', depth: 'Глубина', bevel: 'Фаска',
+  color: 'Цвет', emissive: 'Свечение', shine: 'Направление блика', roughness: 'Шероховатость', depth: 'Глубина', bevel: 'Фаска',
 } as const;
 export const cameraFields = { position: 'Положение', target: 'Точка взгляда', zoom: 'Приближение' } as const;
 export type Property = keyof typeof layerFields | keyof typeof cameraFields;
@@ -36,6 +36,7 @@ export function baseValue(project: Project, target: string, property: Property):
   const layer = project.layers.find(({ id }) => id === target);
   if (!layer || !Object.hasOwn(layerFields, property) || property === 'target' || property === 'zoom') return;
   if (property === 'scale') return layer.scale ?? [1, 1, 1];
+  if (property === 'shine') return layer.shine ?? 0;
   if (property === 'emissive') return layer.emissive ?? '#000000';
   if (property === 'roughness') return layer.roughness ?? materials[layer.material].roughness;
   return layer[property];
@@ -88,6 +89,7 @@ export function evaluate(project: Project, time: number): Project {
         rotation: Array.isArray(patch.rotation) ? patch.rotation : layer.rotation,
         scale: Array.isArray(patch.scale) ? patch.scale : layer.scale,
         color: typeof patch.color === 'string' ? patch.color : layer.color,
+        shine: typeof patch.shine === 'number' ? patch.shine : layer.shine,
         emissive: typeof patch.emissive === 'string' ? patch.emissive : layer.emissive,
         opacity: clamp(patch.opacity, layer.opacity, 0, 1),
         roughness: clamp(patch.roughness, layer.roughness, 0, 1),
@@ -130,7 +132,7 @@ export function valueGap(a: Value, b: Value, property: Property) {
       return property === 'rotation' ? Math.abs(Math.atan2(Math.sin(delta), Math.cos(delta))) : Math.abs(delta);
     }));
   }
-  if (typeof a === 'number' && typeof b === 'number') return Math.abs(a - b);
+  if (typeof a === 'number' && typeof b === 'number') return property === 'shine' ? Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b))) : Math.abs(a - b);
   return a === b ? 0 : 1;
 }
 
@@ -141,4 +143,16 @@ export function isSeamless(project: Project) {
     const b = sampleTrack(track, timeline.duration);
     return a === undefined || b === undefined || valueGap(a, b, track.property) < 0.001;
   });
+}
+
+export function resizeTimeline(timeline: TimelineData, duration: number): TimelineData {
+  if (duration >= timeline.duration) return { ...timeline, duration };
+  const tracks = timeline.tracks.map((track) => {
+    const keys = track.keys.filter((key) => key.time <= duration);
+    if (keys.length === track.keys.length || keys.at(-1)?.time === duration) return { ...track, keys };
+    const value = sampleTrack(track, duration);
+    if (value !== undefined) keys.push({ time: duration, value, easing: { kind: 'linear' } });
+    return { ...track, keys };
+  });
+  return { ...timeline, duration, tracks };
 }

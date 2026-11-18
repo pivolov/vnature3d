@@ -2,7 +2,7 @@ import {
   Aperture, ArrowDownToLine, ChevronDown, FilePlus2, FolderOpen, Grid2X2, PanelBottom, Pause, Play, Download, Layers3, SlidersHorizontal, Save, Video,
   Move, Orbit, Redo2, Undo2, Upload, X,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { Timeline } from './Timeline';
 import { ExportDialog } from './ExportDialog';
 import { PresetLibrary, type PresetSelection } from './PresetLibrary';
@@ -19,6 +19,8 @@ import { primitiveShape } from '../geometry/primitives';
 import { demos } from '../geometry/demos';
 import { importSvg, maxSvgBytes } from '../geometry/svg';
 import { mountViewport } from '../render/viewport';
+
+const LottieDialog = lazy(() => import('./LottieDialog').then((module) => ({ default: module.LottieDialog })));
 
 const useEditor = createEditor({ ...emptyProject, ...importSvg(demos[0].svg), name: demos[0].name });
 const angles = { studio: '3/4', front: 'Спереди', top: 'Сверху', iso: 'Изометрия' } as const;
@@ -148,7 +150,7 @@ export function App() {
   const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
   const [timelineVisible, setTimelineVisible] = useState(true);
   const [inspect, setInspect] = useState<'layer' | 'scene'>('layer');
-  const [exportOpen, setExportOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState<'video' | 'lottie' | false>(false);
   const [grid, setGrid] = useState(true);
   const [gizmo, setGizmo] = useState(false);
   const [error, setError] = useState('');
@@ -442,7 +444,7 @@ export function App() {
       <div className="topbar-end">
         <button className="secondary import-action" aria-label="Импорт" title="Импорт изображения" onClick={() => fileField.current?.click()}><ArrowDownToLine size={16} /><span>Импорт</span></button>
         <button className="primary export-action" aria-label="Экспорт" title="Экспорт сцены" disabled={!project.layers.length || !!graphicsError}
-          onClick={() => { setPlay(0); setPreview(null); setExportOpen(true); }}><Download size={16} /><span>Экспорт</span></button>
+          onClick={() => { setPlay(0); setPreview(null); setExportOpen('video'); }}><Download size={16} /><span>Экспорт</span></button>
       </div>
     </header>
 
@@ -565,7 +567,10 @@ export function App() {
       autoKey={autoKey} setAutoKey={setAutoKey} update={updateTimeline} />
     <footer className="statusbar"><span>{storageStatus || 'Локальный проект'}</span>
       <span>{effectiveLayers.filter((layer) => layer.visible).length} / {project.layers.length} видимых слоёв</span></footer>
-    {exportOpen && <ExportDialog project={project} time={time} close={() => setExportOpen(false)} />}
+    {exportOpen === 'video' && <ExportDialog project={project} time={time} close={() => setExportOpen(false)} lottie={() => setExportOpen('lottie')} />}
+    {exportOpen === 'lottie' && <Suspense fallback={<div className="lottie-loading" role="status">Загрузка экспорта…</div>}>
+      <LottieDialog project={project} time={time} close={() => setExportOpen(false)} video={() => setExportOpen('video')} />
+    </Suspense>}
     {raster && <RasterDialog source={raster} onCancel={() => setRaster(null)} onApply={(layers) => {
       resetTime();
       change(() => ({ ...emptyProject, name: raster.name, layers }));

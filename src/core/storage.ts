@@ -19,14 +19,14 @@ const layer = node.extend({
   color, material: z.enum(Object.keys(materials) as [keyof typeof materials, ...Array<keyof typeof materials>]),
   opacity: num.min(0).max(1), depth: num.min(0.001).max(5), bevel: num.min(0).max(0.35),
   bevelSegments: num.int().min(1).max(8), position: vec3, rotation: vec3, scale: vec3.optional(),
-  emissive: color.optional(), roughness: num.min(0).max(1).optional(),
+  emissive: color.optional(), shine: num.optional(), roughness: num.min(0).max(1).optional(),
 }).refine(({ shapes, relief }) => !!shapes.length || !!relief);
 const easing = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('linear') }), z.object({ kind: z.literal('hold') }),
   z.object({ kind: z.literal('named'), family: z.enum(families), direction: z.enum(['in', 'out', 'in-out']) }),
   z.object({ kind: z.literal('bezier'), x1: num.min(0).max(1), x2: num.min(0).max(1), y1: num.min(-4).max(4), y2: num.min(-4).max(4) }),
 ]);
-const property = z.enum(['position', 'rotation', 'scale', 'opacity', 'color', 'emissive', 'roughness', 'depth', 'bevel', 'target', 'zoom'] satisfies Property[]);
+const property = z.enum(['position', 'rotation', 'scale', 'opacity', 'color', 'emissive', 'shine', 'roughness', 'depth', 'bevel', 'target', 'zoom'] satisfies Property[]);
 const schema = z.object({
   schemaVersion: z.literal(1), name: humanName, layers: z.array(layer).max(1000), groups: z.array(node).max(250).optional(),
   notices: z.array(z.string().max(1024)).max(30), light: z.enum(['studio', 'soft', 'dramatic', 'neon']),
@@ -71,6 +71,10 @@ export function validateProject(raw: unknown): Project {
       throw new Error('В проекте есть повреждённые дорожки анимации.');
     }
     tracks.add(identity);
+  }
+  if (project.timeline) {
+    const last = Math.max(project.timeline.duration, ...project.timeline.tracks.map((track) => track.keys.at(-1)?.time ?? 0));
+    if (last > project.timeline.duration) project.timeline = { ...project.timeline, duration: last };
   }
   return project;
 }

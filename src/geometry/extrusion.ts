@@ -9,7 +9,7 @@ function outline(path: Path, points: Vec2[]) {
   return path;
 }
 
-export function extrudeLayer(layer: Layer) {
+export function extrudeLayer(layer: Layer, smooth = true) {
   if (layer.relief) {
     const { width, height, heights } = layer.relief;
     const scale = 3.8 / Math.max(width, height);
@@ -35,6 +35,7 @@ export function extrudeLayer(layer: Layer) {
     bevelThickness: layer.bevel, bevelSegments: layer.bevelSegments,
   });
   geometry.translate(0, 0, -layer.depth / 2);
+  if (!smooth) return geometry;
   toCreasedNormals(geometry, layer.bevel > 0 ? Math.PI / 3 + 0.002 : Math.PI / 4);
 
   // The bevel meets both caps tangentially. Match the shared boundary normal

@@ -19,7 +19,7 @@ function dimensions(size: keyof typeof resolution, ratio: Ratio) {
 }
 const textSize = (bytes: number) => new Intl.NumberFormat('ru', { maximumFractionDigits: 1 }).format(bytes / 1_000_000) + ' МБ';
 
-export function ExportDialog({ project, time, close }: { project: Project; time: number; close: () => void }) {
+export function ExportDialog({ project, time, close, lottie }: { project: Project; time: number; close: () => void; lottie: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const job = useRef<AbortController | null>(null);
   const progressClock = useRef(0);
@@ -93,6 +93,8 @@ export function ExportDialog({ project, time, close }: { project: Project; time:
     <header className="export-heading"><div>
       <h2 id="export-title">Экспорт сцены</h2><p title={project.name}>{project.name}</p>
     </div><button className="icon-button" aria-label="Закрыть экспорт" onClick={dismiss}><X size={18} /></button></header>
+    <div className="lottie-mode-tabs"><button className="text-button" aria-pressed="true">Видео и PNG</button>
+      <button className="text-button" disabled={running} onClick={lottie}>Lottie</button></div>
     <fieldset disabled={running} className="export-controls">
       <div className="export-formats" aria-label="Формат экспорта">
         {(Object.keys(formats) as ExportFormat[]).map((format) => <button key={format} type="button" aria-pressed={format === config.format}

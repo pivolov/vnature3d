@@ -4,7 +4,7 @@ import { staggerRanks, type PresetOptions } from '../animation/presets';
 import { ease, families, type Easing } from '../animation/easing';
 import {
   baseValue, cameraFields, cameraId, changeKeys, defaultTimeline, frameTime, isSeamless, layerFields,
-  putKey, sampleTrack, type Key, type Property, type TimelineData, type Track, type Value,
+  putKey, resizeTimeline, sampleTrack, type Key, type Property, type TimelineData, type Track, type Value,
 } from '../animation/timeline';
 import type { Project, Vec3 } from '../core/project';
 
@@ -277,10 +277,10 @@ export function Timeline({ project, target, layerName, disabled, time, seek, pla
       </div>
       <div className="timeline-tools">
         {mode === 'scene' && <div className="timeline-settings">
-          <label className="timeline-field">Длина, с<input aria-label="Длительность" type="number" min={0.1} max={120} step={0.1}
+          <label className="timeline-field">Длина, с<input title="При сокращении ключи за новым концом обрезаются. Изменение можно отменить." aria-label="Длительность" type="number" min={0.1} max={120} step={0.1}
             key={data.duration} defaultValue={data.duration} onBlur={(event) => {
               const duration = event.currentTarget.valueAsNumber;
-              if (Number.isFinite(duration)) update((current) => ({ ...current, duration: Math.max(0.1, Math.min(120, duration)) }));
+              if (Number.isFinite(duration)) update((current) => resizeTimeline(current, Math.max(0.1, Math.min(120, duration))));
             }} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} /></label>
           <label className="timeline-field">FPS<select value={data.fps} onChange={(event) => {
             const fps = Number(event.currentTarget.value) as TimelineData['fps']; update((current) => ({ ...current, fps }));
