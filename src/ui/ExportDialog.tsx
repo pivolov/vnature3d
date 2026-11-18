@@ -19,7 +19,7 @@ function dimensions(size: keyof typeof resolution, ratio: Ratio) {
 }
 const textSize = (bytes: number) => new Intl.NumberFormat('ru', { maximumFractionDigits: 1 }).format(bytes / 1_000_000) + ' МБ';
 
-export function ExportDialog({ project, time, close, lottie }: { project: Project; time: number; close: () => void; lottie: () => void }) {
+export function ExportDialog({ project, time, close, lottie, graphicsAvailable }: { project: Project; time: number; close: () => void; lottie: () => void; graphicsAvailable: boolean }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const job = useRef<AbortController | null>(null);
   const progressClock = useRef(0);
@@ -36,7 +36,7 @@ export function ExportDialog({ project, time, close, lottie }: { project: Projec
     bitrate: 10_000_000, transparent: true, color: '#666666', supersample: false, motionSamples: 1,
   });
   const plan = framePlan(project, config, time);
-  const issue = checkExport(config);
+  const issue = graphicsAvailable ? checkExport(config) : 'Для экспорта видео и PNG нужен WebGL 2. Lottie доступен во вкладке рядом.';
   const video = config.format === 'mp4' || config.format === 'webm';
   const estimate = video ? config.bitrate / 8 * plan.duration * (config.transparent && config.format === 'webm' ? 1.27 : 1) : null;
 

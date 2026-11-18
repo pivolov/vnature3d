@@ -2,7 +2,7 @@ import {
   Aperture, ArrowDownToLine, ChevronDown, FilePlus2, FolderOpen, Grid2X2, PanelBottom, Pause, Play, Download, Layers3, SlidersHorizontal, Save, Video,
   Move, Orbit, Redo2, Undo2, Upload, X,
 } from 'lucide-react';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from 'react';
 import { Timeline } from './Timeline';
 import { ExportDialog } from './ExportDialog';
 import { PresetLibrary, type PresetSelection } from './PresetLibrary';
@@ -23,6 +23,7 @@ import { mountViewport } from '../render/viewport';
 const LottieDialog = lazy(() => import('./LottieDialog').then((module) => ({ default: module.LottieDialog })));
 
 const useEditor = createEditor({ ...emptyProject, ...importSvg(demos[0].svg), name: demos[0].name });
+const frameRatios = { '1:1': 1, '4:5': 4 / 5, '9:16': 9 / 16, '9:19.5': 9 / 19.5, '16:9': 16 / 9 } as const;
 const angles = { studio: '3/4', front: 'Спереди', top: 'Сверху', iso: 'Изометрия' } as const;
 const lights = { studio: 'Студия', soft: 'Мягкий', dramatic: 'Драматичный', neon: 'Неон' } as const;
 
@@ -156,6 +157,8 @@ export function App() {
   const [error, setError] = useState('');
   const [raster, setRaster] = useState<RasterSource | null>(null);
   const [graphicsError, setGraphicsError] = useState('');
+  const [graphicsRevision, resetGraphics] = useState(0);
+  const [frameGuide, setFrameGuide] = useState<keyof typeof frameRatios | ''>('');
 
   function seek(value: number) {
     const next = Math.max(0, Math.min(sceneTimeline.duration, value));
@@ -274,6 +277,10 @@ export function App() {
     try {
       viewport.current = mountViewport(host.current, {
         select: selectLayer,
+        graphics: (restored) => {
+          if (restored) { setGraphicsError(''); resetGraphics((value) => value + 1); }
+          else setGraphicsError('GPU прервал предпросмотр. Редактор попробует восстановить сцену.');
+        },
         move: (id, position) => actions.current?.layer(id, { position }),
         orbit: (position, target, zoom) => actions.current?.camera({ position, target, zoom }),
       });
@@ -284,17 +291,29 @@ export function App() {
       viewport.current?.dispose();
       viewport.current = null;
     };
-  }, [selectLayer]);
+  }, [selectLayer, graphicsRevision]);
 
   useEffect(() => {
     viewport.current?.update(previewPose || pose, selectedId, grid && viewMode === 'edit', gizmo && !play && !previewPose && viewMode === 'edit');
-  }, [pose, previewPose, selectedId, grid, gizmo, play, viewMode]);
+  }, [pose, previewPose, selectedId, grid, gizmo, play, viewMode, graphicsRevision]);
 
   useEffect(() => {
     function shortcuts(event: KeyboardEvent) {
       if (document.querySelector('dialog[open]')) return;
       if (event.target instanceof HTMLElement && event.target.closest('input, textarea, select, [contenteditable]')) return;
+      if (event.code === 'Escape') {
+        setViewMode('edit'); setMobilePanel(null); setPreview(null); return;
+      }
       if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+      if (event.code === 'KeyS' && !event.shiftKey) {
+        event.preventDefault(); downloadProject(useEditor.getState().project); return;
+      }
+      if (event.code === 'KeyO' && !event.shiftKey) {
+        event.preventDefault(); projectField.current?.click(); return;
+      }
+      if (event.code === 'KeyE' && event.shiftKey && useEditor.getState().project.layers.length) {
+        event.preventDefault(); setPlay(0); setPreview(null); setExportOpen('video'); return;
+      }
       if (event.code === 'KeyZ' || event.code === 'KeyY') {
         event.preventDefault();
         if (event.shiftKey || event.code === 'KeyY') redo();
@@ -443,7 +462,7 @@ export function App() {
         }} />
       <div className="topbar-end">
         <button className="secondary import-action" aria-label="Импорт" title="Импорт изображения" onClick={() => fileField.current?.click()}><ArrowDownToLine size={16} /><span>Импорт</span></button>
-        <button className="primary export-action" aria-label="Экспорт" title="Экспорт сцены" disabled={!project.layers.length || !!graphicsError}
+        <button className="primary export-action" aria-label="Экспорт" title="Экспорт сцены" disabled={!effectiveLayers.some(({ visible }) => visible)}
           onClick={() => { setPlay(0); setPreview(null); setExportOpen('video'); }}><Download size={16} /><span>Экспорт</span></button>
       </div>
     </header>
@@ -508,6 +527,9 @@ export function App() {
           </div>
         </div>
         <div className="viewport-host" ref={host} />
+        {!!frameGuide && !graphicsError && viewMode === 'edit' && <div className="safe-area" aria-hidden="true">
+          <div style={{ '--frame-aspect': frameRatios[frameGuide] } as CSSProperties}><i /></div>
+        </div>}
         {!(previewPose || project).layers.length && !graphicsError && <div className="empty-canvas">
           <Upload size={29} />
           <h2>Перетащите SVG, PNG или JPG</h2>
@@ -531,7 +553,11 @@ export function App() {
             {(Object.keys(angles) as CameraPreset[]).map((preset) =>
               <button key={preset} aria-pressed={project.camera.preset === preset} onClick={() => angle(preset)}>{angles[preset]}</button>)}
           </div>
-          <span>Перетаскивание · обзор<br />Колесо · масштаб</span>
+          <select className="frame-guide-select" aria-label="Рамка кадра" value={frameGuide}
+            onChange={(event) => setFrameGuide(event.currentTarget.value as keyof typeof frameRatios | '')}>
+            <option value="">Рамка кадра</option>
+            {Object.keys(frameRatios).map((ratio) => <option key={ratio}>{ratio}</option>)}
+          </select>
         </div>
       </main>
 
@@ -567,7 +593,7 @@ export function App() {
       autoKey={autoKey} setAutoKey={setAutoKey} update={updateTimeline} />
     <footer className="statusbar"><span>{storageStatus || 'Локальный проект'}</span>
       <span>{effectiveLayers.filter((layer) => layer.visible).length} / {project.layers.length} видимых слоёв</span></footer>
-    {exportOpen === 'video' && <ExportDialog project={project} time={time} close={() => setExportOpen(false)} lottie={() => setExportOpen('lottie')} />}
+    {exportOpen === 'video' && <ExportDialog project={project} time={time} graphicsAvailable={!graphicsError} close={() => setExportOpen(false)} lottie={() => setExportOpen('lottie')} />}
     {exportOpen === 'lottie' && <Suspense fallback={<div className="lottie-loading" role="status">Загрузка экспорта…</div>}>
       <LottieDialog project={project} time={time} close={() => setExportOpen(false)} video={() => setExportOpen('video')} />
     </Suspense>}

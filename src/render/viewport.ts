@@ -7,6 +7,7 @@ import { createProjectScene, projection } from './projectScene';
 type Callbacks = {
   select: (id: string) => void;
   move: (id: string, position: Vec3) => void;
+  graphics: (restored: boolean) => void;
   orbit: (position: Vec3, target: Vec3, zoom: number) => void;
 };
 
@@ -21,7 +22,9 @@ export function mountViewport(host: HTMLDivElement, callbacks: Callbacks) {
   renderer.domElement.setAttribute('aria-label', 'Трёхмерный предпросмотр');
   renderer.domElement.setAttribute('role', 'img');
 
-  const model = createProjectScene(renderer);
+  let model: ReturnType<typeof createProjectScene>;
+  try { model = createProjectScene(renderer); }
+  catch (error) { renderer.domElement.remove(); renderer.dispose(); renderer.forceContextLoss(); throw error; }
   const { scene, meshes } = model;
   const perspective = new PerspectiveCamera(35, 1, 0.05, 100);
   const orthographic = new OrthographicCamera(-3, 3, 3, -3, 0.05, 100);
@@ -48,8 +51,19 @@ export function mountViewport(host: HTMLDivElement, callbacks: Callbacks) {
   let gizmo = false;
   let pendingFrame = 0;
 
+  let lost = false;
+  function onLost(event: Event) {
+    event.preventDefault();
+    lost = true;
+    cancelAnimationFrame(pendingFrame);
+    pendingFrame = 0;
+    callbacks.graphics(false);
+  }
+  function onRestored() { callbacks.graphics(true); }
+  renderer.domElement.addEventListener('webglcontextlost', onLost);
+  renderer.domElement.addEventListener('webglcontextrestored', onRestored);
   function draw() {
-    if (pendingFrame) return;
+    if (lost || pendingFrame) return;
     pendingFrame = requestAnimationFrame(() => {
       pendingFrame = 0;
       if (selected && bounds.visible) bounds.update();
@@ -145,7 +159,10 @@ export function mountViewport(host: HTMLDivElement, callbacks: Callbacks) {
       model.dispose();
       bounds.dispose();
       grid.dispose();
+      renderer.domElement.removeEventListener('webglcontextlost', onLost);
+      renderer.domElement.removeEventListener('webglcontextrestored', onRestored);
       renderer.dispose();
+      if (!lost) renderer.forceContextLoss();
       renderer.domElement.remove();
     },
   };

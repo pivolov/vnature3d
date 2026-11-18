@@ -24,14 +24,15 @@ const sameTime = (a: number, b: number) => Math.abs(a - b) < 1e-6;
 function EditValue({ value, property, onChange }: { value: Value; property: Property; onChange: (value: Value) => void }) {
   if (typeof value === 'string') return <label className="timeline-field">Цвет <input type="color" key={value} defaultValue={value}
     onBlur={(event) => onChange(event.currentTarget.value)} /></label>;
+  const angle = property === 'rotation' || property === 'shine';
   return (Array.isArray(value) ? value : [value]).map((raw, index) => {
-    const shown = property === 'rotation' ? raw * 180 / Math.PI : raw;
+    const shown = angle ? raw * 180 / Math.PI : raw;
     const label = Array.isArray(value) ? ['X', 'Y', 'Z'][index] : 'Значение';
     return <label className="timeline-field" key={label + raw}>{label}<input type="number" step="any" defaultValue={Number(shown.toFixed(4))}
       onBlur={(event) => {
         const next = event.currentTarget.valueAsNumber;
         if (!Number.isFinite(next) || Math.abs(next - shown) < 0.00005) return;
-        const converted = property === 'rotation' ? next * Math.PI / 180 : next;
+        const converted = angle ? next * Math.PI / 180 : next;
         if (Array.isArray(value)) {
           const tuple: Vec3 = [...value];
           tuple[index] = converted;

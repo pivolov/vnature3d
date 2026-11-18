@@ -49,6 +49,30 @@ export function createProjectScene(renderer: WebGLRenderer) {
   pmrem.dispose();
 
   const meshes = new Map<string, { layer: Layer; mesh: Mesh<BufferGeometry, MeshPhysicalMaterial> }>();
+  const sources = new WeakMap<object, Map<string, BufferGeometry>>();
+  const references = new Map<BufferGeometry, { pool: Map<string, BufferGeometry>; key: string; count: number }>();
+  function acquire(layer: Layer) {
+    const source = layer.relief ?? layer.shapes;
+    let pool = sources.get(source);
+    if (!pool) { pool = new Map(); sources.set(source, pool); }
+    const key = layer.depth + '/' + layer.bevel + '/' + layer.bevelSegments;
+    const existing = pool.get(key);
+    if (existing) {
+      references.get(existing)!.count++;
+      return existing;
+    }
+    const geometry = extrudeLayer(layer);
+    pool.set(key, geometry);
+    references.set(geometry, { pool, key, count: 1 });
+    return geometry;
+  }
+  function release(geometry: BufferGeometry) {
+    const ref = references.get(geometry);
+    if (!ref || --ref.count) return;
+    ref.pool.delete(ref.key);
+    references.delete(geometry);
+    geometry.dispose();
+  }
 
   return {
     scene,
@@ -65,7 +89,7 @@ export function createProjectScene(renderer: WebGLRenderer) {
       for (const [id, { mesh }] of meshes) {
         if (ids.has(id)) continue;
         scene.remove(mesh);
-        mesh.geometry.dispose();
+        release(mesh.geometry);
         mesh.material.dispose();
         meshes.delete(id);
       }
@@ -73,14 +97,15 @@ export function createProjectScene(renderer: WebGLRenderer) {
         const layer = effectiveLayer(project, sourceLayer);
         const previous = meshes.get(layer.id);
         if (previous?.layer === layer) continue;
-        const mesh = previous?.mesh ?? new Mesh(extrudeLayer(layer), new MeshPhysicalMaterial());
+        const mesh = previous?.mesh ?? new Mesh(acquire(layer), new MeshPhysicalMaterial());
         if (!previous) {
           mesh.name = layer.id;
           scene.add(mesh);
         } else if (previous.layer.shapes !== layer.shapes || previous.layer.relief !== layer.relief || previous.layer.depth !== layer.depth ||
           previous.layer.bevel !== layer.bevel || previous.layer.bevelSegments !== layer.bevelSegments) {
-          mesh.geometry.dispose();
-          mesh.geometry = extrudeLayer(layer);
+          const next = acquire(layer);
+          release(mesh.geometry);
+          mesh.geometry = next;
         }
         if (!previous || previous.layer.material !== layer.material || previous.layer.color !== layer.color ||
           previous.layer.emissive !== layer.emissive || previous.layer.roughness !== layer.roughness ||
@@ -91,6 +116,7 @@ export function createProjectScene(renderer: WebGLRenderer) {
           const map = layer.shine === undefined ? null : environment.texture;
           if (mesh.material.side !== side || mesh.material.transparent !== transparent || mesh.material.envMap !== map) mesh.material.needsUpdate = true;
           mesh.material.envMap = map;
+          mesh.material.envMapIntensity = scene.environmentIntensity;
           mesh.material.envMapRotation.set(0.16, layer.shine ?? 0, 0.1);
           mesh.material.setValues({ color: layer.color, emissive: layer.emissive ?? '#000000',
             roughness: layer.roughness ?? roughness, metalness, clearcoat, side, opacity: layer.opacity, transparent, depthWrite: !transparent });
@@ -105,7 +131,7 @@ export function createProjectScene(renderer: WebGLRenderer) {
     },
     dispose() {
       for (const { mesh } of meshes.values()) {
-        mesh.geometry.dispose();
+        release(mesh.geometry);
         mesh.material.dispose();
       }
       meshes.clear();
