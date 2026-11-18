@@ -1,7 +1,8 @@
-# Logo/Icon 3D Animator
+# Logo Studio — запуск через Live Server
 
-Веб-инструмент: PNG/SVG → 3D → анимация → экспорт в Lottie и MP4 для iOS/Android.
+1. Скачай ZIP этой ветки на GitHub и распакуй архив.
+2. В VS Code выбери **File → Open Folder** и открой распакованную папку `vnature3d-live-server`.
+3. Если расширение **Live Server** ещё не установлено, открой **Extensions**, найди **Live Server** от **Ritwick Dey** и нажми **Install**.
+4. В списке файлов слева нажми правой кнопкой на `index.html` и выбери **Open with Live Server**. Редактор откроется в браузере.
 
-Спецификация: [SPEC.md](SPEC.md). Инструкции для агента: [AGENTS.md](AGENTS.md).
-
-Запуск Codex: «Прочитай AGENTS.md и SPEC.md и выполни Этап 0».
+Для проверки открой пример «Орбита» или нажми «Импорт SVG». Для 3D-превью нужен браузер с WebGL 2. Эта папка содержит готовую сборку этапа 1.
