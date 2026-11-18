@@ -46,7 +46,8 @@ export function PrimitiveEditor({ layers, selected, onAdd, onCombine, onError }:
         data = await response.arrayBuffer();
       }
       const value = text.trim();
-      if (id === request.current) addCurrent.current(makeLayer(value, textShapes(value, data), '#d6f494'));
+      const shapes = await textShapes(value, data);
+      if (id === request.current) addCurrent.current(makeLayer(value, shapes, '#d6f494'));
     } catch (error) {
       if (id === request.current) onError(error instanceof Error ? error.message : 'Не удалось построить текст.');
     } finally {

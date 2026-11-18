@@ -1,7 +1,7 @@
 import { Play, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { type Easing } from '../animation/easing';
-import { presetDefaults, presets, templates, type PresetId, type PresetOptions, type TemplateId } from '../animation/presets';
+import { presetDefaults, presetGraph, presets, templates, type PresetId, type PresetOptions, type TemplateId } from '../animation/presets';
 
 export type PresetSelection = { type: 'preset'; id: PresetId } | { type: 'template'; id: TemplateId };
 type Props = {
@@ -9,6 +9,7 @@ type Props = {
   preview: (value: { selection: PresetSelection; options: PresetOptions; all: boolean } | null) => void;
   apply: (selection: PresetSelection, options: PresetOptions, all: boolean) => void;
 };
+const graphs = new Map((Object.keys(presets) as PresetId[]).map((id) => [id, presetGraph(id)]));
 const categories = [...new Set(Object.values(presets).map(({ group }) => group))];
 const presetOptions = [
   ['duration', 'Длина, с', 0.1, 20, 0.1], ['delay', 'Задержка, с', 0, 30, 0.05],
@@ -53,12 +54,16 @@ export function PresetLibrary({ canAnimate, canAnimateSelected, preview, apply }
     <div className="preset-list">
       {items.map(({ name, entry }) => <button type="button" key={entry.id}
         aria-pressed={active.id === entry.id} disabled={!eligible(entry)} title="Наведите для предпросмотра"
-        onPointerEnter={() => show(entry)} onPointerLeave={() => preview(null)}
+        onPointerEnter={(event) => { if (event.pointerType === 'mouse') show(entry); }} onPointerLeave={() => preview(null)}
         onClick={() => setSelection(entry)}>
-        <Play size={12} /><span>{name}</span>
+        <svg viewBox="0 0 44 36" aria-hidden="true" className="preset-graph">
+          <path d="M4 29H40" className="preset-grid" />
+          <path d={graphs.get(entry.type === 'preset' ? entry.id : templates[entry.id].sequence[0])} className="preset-shape" />
+        </svg>
+        <span>{name}</span>
       </button>)}
     </div>
-    <div className="preset-fields">
+    <details className="preset-options"><summary>Параметры пресета</summary><div className="preset-fields">
       <label className="preset-field"><span>Применить к</span>
         <select value={all ? 'all' : 'selected'} onChange={(event) => setScope(event.currentTarget.value as typeof scope)}>
           <option value="selected" disabled={!canAnimateSelected}>Выбранному</option><option value="all">Всей сцене</option>
@@ -87,7 +92,7 @@ export function PresetLibrary({ canAnimate, canAnimateSelected, preview, apply }
           <option value="smooth">Мягкая</option><option value="exit">Плавный выход</option>
           <option value="elastic">Упругая</option><option value="linear">Линейная</option>
         </select></label>
-    </div>
+    </div></details>
     <div className="preset-actions">
       <button type="button" className="secondary" disabled={!eligible(active)} onFocus={() => show(active)} onBlur={() => preview(null)}
         onPointerEnter={() => show(active)} onPointerLeave={() => preview(null)} onClick={() => show(active)} title="Предпросмотр">

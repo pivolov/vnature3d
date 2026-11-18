@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronLeft, ChevronRight, Copy, Eye, EyeOff, Folder, FolderPlus, GripVertical, Lock, Pencil, Trash2, Unlock } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Copy, Eye, EyeOff, Folder, FolderPlus, GripVertical, Lock, Pencil, Search, Trash2, Unlock } from 'lucide-react';
 import { memo, useLayoutEffect, useRef, useState, type DragEvent } from 'react';
 import { childrenOf, deleteNode, duplicateNode, moveNode, treeItems, updateNode, type TreeItem } from '../core/layers';
 import type { Project } from '../core/project';
@@ -17,6 +17,7 @@ export const LayerTree = memo(function LayerTree({ project, selectedId, change, 
   const [rename, setRename] = useState<string | null>(null);
   const [dropId, setDropId] = useState<string | null>(null);
   const list = useRef<HTMLDivElement>(null);
+  const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(6);
   useLayoutEffect(() => {
@@ -57,10 +58,10 @@ export const LayerTree = memo(function LayerTree({ project, selectedId, change, 
 
   function flatten(parentId?: string, depth = 0): Array<TreeItem & { depth: number }> {
     return childrenOf(project, parentId).flatMap((item) => [
-      { ...item, depth }, ...(item.kind === 'group' && !collapsed.has(item.node.id) ? flatten(item.node.id, depth + 1) : []),
+      { ...item, depth }, ...(item.kind === 'group' && (!!query || !collapsed.has(item.node.id)) ? flatten(item.node.id, depth + 1) : []),
     ]);
   }
-  const entries = flatten();
+  const entries = flatten().filter(({ node }) => node.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
   const pages = Math.max(1, Math.ceil(entries.length / pageSize));
   const currentPage = Math.min(page, pages - 1);
 
@@ -112,6 +113,8 @@ export const LayerTree = memo(function LayerTree({ project, selectedId, change, 
   }
 
   return <>
+    <label className="layer-search"><Search size={14} /><input aria-label="Найти слой" type="search" placeholder="Найти слой" value={query}
+      onChange={(event) => { setQuery(event.currentTarget.value); setPage(0); }} /></label>
     <div className="tree-tools" aria-label="Действия со слоями">
       <button className="tree-icon" title="Создать группу" aria-label="Создать группу" onClick={group}><FolderPlus size={15} /></button>
       <button className="tree-icon" title="Переименовать" aria-label="Переименовать" disabled={!selected}
@@ -129,7 +132,8 @@ export const LayerTree = memo(function LayerTree({ project, selectedId, change, 
     </div>
     <div ref={list} className="layer-list tree-list" onDragOver={(event) => allowDrop(event, '')} onDrop={(event) => drop(event)}>
       {rows()}
-      {!project.layers.length && !project.groups?.length && <p className="muted-empty">Импортируйте изображение или добавьте фигуру.</p>}
+      {!!query && !entries.length && <p className="muted-empty">Слои не найдены.</p>}
+      {!query && !project.layers.length && !project.groups?.length && <p className="muted-empty">Импортируйте изображение или добавьте фигуру.</p>}
     </div>
     <div className="layer-page" onDragOver={(event) => allowDrop(event, '')} onDrop={(event) => drop(event)}>
       {dropId !== null && <div className={'tree-root-drop' + (!dropId ? ' drag-over' : '')}>В корень</div>}

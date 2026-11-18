@@ -1,26 +1,13 @@
-import {
-  AmbientLight, BoxHelper, Color, DirectionalLight, DoubleSide, FrontSide, BufferGeometry, GridHelper, Mesh, MeshPhysicalMaterial, NeutralToneMapping,
-  OrthographicCamera, PerspectiveCamera, PMREMGenerator, Raycaster, Scene, Vector2, WebGLRenderer,
-} from 'three';
+import { BoxHelper, Color, GridHelper, Mesh, OrthographicCamera, PerspectiveCamera, Raycaster, Vector2, WebGLRenderer } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { materials, type Layer, type Project, type Vec3 } from '../core/project';
+import { type Project, type Vec3 } from '../core/project';
+import { createProjectScene, projection } from './projectScene';
 
 type Callbacks = {
   select: (id: string) => void;
   move: (id: string, position: Vec3) => void;
   orbit: (position: Vec3, target: Vec3, zoom: number) => void;
-};
-
-import { effectiveLayer } from '../core/layers';
-import { extrudeLayer } from '../geometry/extrusion';
-
-const lighting = {
-  studio: { ambient: 1.4, key: 3, fill: 1.1, rim: 2.1, tint: '#ffffff' },
-  soft: { ambient: 2, key: 1.6, fill: 1.2, rim: 0.8, tint: '#ffffff' },
-  dramatic: { ambient: 0.35, key: 4.3, fill: 0.2, rim: 3, tint: '#ffd2aa' },
-  neon: { ambient: 0.65, key: 2.1, fill: 1.2, rim: 4, tint: '#ed6eff' },
 };
 
 function sameVector(a: Vec3, b: Vec3) {
@@ -29,14 +16,13 @@ function sameVector(a: Vec3, b: Vec3) {
 
 export function mountViewport(host: HTMLDivElement, callbacks: Callbacks) {
   const renderer = new WebGLRenderer({ antialias: true, alpha: true });
-  renderer.toneMapping = NeutralToneMapping;
-  renderer.toneMappingExposure = 0.8;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   host.append(renderer.domElement);
   renderer.domElement.setAttribute('aria-label', 'Трёхмерный предпросмотр');
   renderer.domElement.setAttribute('role', 'img');
 
-  const scene = new Scene();
+  const model = createProjectScene(renderer);
+  const { scene, meshes } = model;
   const perspective = new PerspectiveCamera(35, 1, 0.05, 100);
   const orthographic = new OrthographicCamera(-3, 3, 3, -3, 0.05, 100);
   let camera: PerspectiveCamera | OrthographicCamera = perspective;
@@ -51,25 +37,9 @@ export function mountViewport(host: HTMLDivElement, callbacks: Callbacks) {
 
   const grid = new GridHelper(24, 48, '#424242', '#272727');
   grid.position.y = -2.2;
+  grid.material.transparent = true;
+  grid.material.opacity = 0.43;
   scene.add(grid);
-  const ambient = new AmbientLight('#f5f5f5');
-  const key = new DirectionalLight('#fffaf4');
-  key.position.set(3, 5, 5);
-  const fill = new DirectionalLight('#ededed');
-  fill.position.set(-4, 1, 4);
-  const rim = new DirectionalLight();
-  rim.position.set(1, 3, -5);
-  scene.add(ambient, key, fill, rim);
-
-  const pmrem = new PMREMGenerator(renderer);
-  const room = new RoomEnvironment();
-  const environment = pmrem.fromScene(room, 0.04);
-  scene.environment = environment.texture;
-  scene.environmentIntensity = 0.82;
-  room.dispose();
-  pmrem.dispose();
-
-  const meshes = new Map<string, { layer: Layer; mesh: Mesh<BufferGeometry, MeshPhysicalMaterial> }>();
   const bounds = new BoxHelper(grid, new Color('#c9ef88'));
   bounds.visible = false;
   scene.add(bounds);
@@ -91,16 +61,7 @@ export function mountViewport(host: HTMLDivElement, callbacks: Callbacks) {
     const w = host.clientWidth;
     const h = host.clientHeight;
     if (!w || !h) return;
-    const aspect = w / h;
-    perspective.aspect = aspect;
-    perspective.fov = aspect >= 1 ? 35 : Math.min(95, 35 / aspect);
-    perspective.updateProjectionMatrix();
-    const half = Math.max(2.85, 2.85 / aspect);
-    orthographic.left = -half * aspect;
-    orthographic.right = half * aspect;
-    orthographic.top = half;
-    orthographic.bottom = -half;
-    orthographic.updateProjectionMatrix();
+    projection(w, h, perspective, orthographic);
     renderer.setSize(w, h);
     draw();
   }
@@ -133,10 +94,12 @@ export function mountViewport(host: HTMLDivElement, callbacks: Callbacks) {
     start.set(event.clientX, event.clientY);
   });
   renderer.domElement.addEventListener('pointerup', (event) => {
-    if (!picking || start.distanceTo(new Vector2(event.clientX, event.clientY)) > 4) return;
+    const candidate = picking;
+    picking = false;
+    if (!candidate || start.distanceTo(new Vector2(event.clientX, event.clientY)) > 4) return;
     const rect = renderer.domElement.getBoundingClientRect();
     ray.setFromCamera(new Vector2(2 * (event.clientX - rect.left) / rect.width - 1, 1 - 2 * (event.clientY - rect.top) / rect.height), camera);
-    const hit = ray.intersectObjects([...meshes.values()].map(({ mesh }) => mesh).filter((mesh) => mesh.visible && !meshes.get(mesh.name)?.layer.locked), false)[0];
+    const hit = ray.intersectObjects([...meshes.values()].map(({ mesh }) => mesh).filter((mesh) => mesh.visible && mesh.material.opacity > 0.001 && !meshes.get(mesh.name)?.layer.locked), false)[0];
     if (hit) callbacks.select(hit.object.name);
   });
 
@@ -151,53 +114,16 @@ export function mountViewport(host: HTMLDivElement, callbacks: Callbacks) {
         orbit.object = camera;
         orbit.target.set(...project.camera.target);
         orbit.update();
+        // Orbit controls constrain pointer input, but an evaluated camera track
+        // must keep the same pose in the editor and the offline renderer.
+        camera.position.set(...project.camera.position);
+        camera.zoom = project.camera.zoom;
+        camera.lookAt(...project.camera.target);
+        camera.updateProjectionMatrix();
         transform.camera = camera;
       }
-      const preset = lighting[project.light];
-      ambient.intensity = preset.ambient;
-      key.intensity = preset.key;
-      fill.intensity = preset.fill;
-      rim.intensity = preset.rim;
-      rim.color.set(preset.tint);
       grid.visible = showGrid;
-
-      const ids = new Set(project.layers.map((layer) => layer.id));
-      for (const [id, { mesh }] of meshes) {
-        if (ids.has(id)) continue;
-        scene.remove(mesh);
-        mesh.geometry.dispose();
-        mesh.material.dispose();
-        meshes.delete(id);
-      }
-      for (const sourceLayer of project.layers) {
-        const layer = effectiveLayer(project, sourceLayer);
-        const previous = meshes.get(layer.id);
-        if (previous?.layer === layer) continue;
-        const mesh = previous?.mesh ?? new Mesh(extrudeLayer(layer), new MeshPhysicalMaterial());
-        if (!previous) {
-          mesh.name = layer.id;
-          scene.add(mesh);
-        } else if (previous.layer.shapes !== layer.shapes || previous.layer.relief !== layer.relief || previous.layer.depth !== layer.depth ||
-          previous.layer.bevel !== layer.bevel || previous.layer.bevelSegments !== layer.bevelSegments) {
-          mesh.geometry.dispose();
-          mesh.geometry = extrudeLayer(layer);
-        }
-        if (!previous || previous.layer.material !== layer.material || previous.layer.color !== layer.color ||
-          previous.layer.emissive !== layer.emissive || previous.layer.roughness !== layer.roughness ||
-          previous.layer.opacity !== layer.opacity || previous.layer.relief !== layer.relief) {
-          const { roughness, metalness, clearcoat } = materials[layer.material];
-          const side = layer.relief ? DoubleSide : FrontSide;
-          const transparent = layer.opacity < 1;
-          if (mesh.material.side !== side || mesh.material.transparent !== transparent) mesh.material.needsUpdate = true;
-          mesh.material.setValues({ color: layer.color, emissive: layer.emissive ?? '#000000',
-            roughness: layer.roughness ?? roughness, metalness, clearcoat, side, opacity: layer.opacity, transparent, depthWrite: !transparent });
-        }
-        mesh.position.set(...layer.position);
-        mesh.scale.set(...(layer.scale ?? [1, 1, 1]));
-        mesh.rotation.set(...layer.rotation);
-        mesh.visible = layer.visible;
-        meshes.set(layer.id, { layer, mesh });
-      }
+      model.update(project);
 
       const entry = selectedId ? meshes.get(selectedId) : undefined;
       const next = entry?.layer.locked ? undefined : entry?.mesh;
@@ -216,13 +142,9 @@ export function mountViewport(host: HTMLDivElement, callbacks: Callbacks) {
       cancelAnimationFrame(pendingFrame);
       transform.dispose();
       orbit.dispose();
-      for (const { mesh } of meshes.values()) {
-        mesh.geometry.dispose();
-        mesh.material.dispose();
-      }
+      model.dispose();
       bounds.dispose();
       grid.dispose();
-      environment.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     },

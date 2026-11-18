@@ -38,3 +38,19 @@ it('creates a seamless loader template using real material and keyframes', () =>
   expect(isSeamless(result)).toBe(true);
   expect(evaluate(result, 0.5).layers[0].rotation).not.toEqual(layer.rotation);
 });
+
+it('starts a preset from the evaluated motion and keeps keys before its range', () => {
+  const input = {
+    ...emptyProject, layers: [layer],
+    timeline: { duration: 4, fps: 30, loop: 'once', tracks: [{
+      target: layer.id, property: 'position', keys: [
+        { time: 0, value: [0, 0, 0], easing: { kind: 'linear' } },
+        { time: 2, value: [2, 0, 0], easing: { kind: 'linear' } },
+      ],
+    }] },
+  } satisfies Parameters<typeof applyPreset>[0];
+  const result = applyPreset(input, 'float', [layer.id], 1, presetDefaults);
+  expect(evaluate(result, 0).layers[0].position).toEqual([0, 0, 0]);
+  expect(evaluate(result, 1).layers[0].position).toEqual([1, 0, 0]);
+  expect(evaluate(result, 1.4).layers[0].position[1]).toBeCloseTo(0.35);
+});

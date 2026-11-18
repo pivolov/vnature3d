@@ -1,8 +1,8 @@
 import { Quaternion, Vector3 } from 'three';
 import { effectiveLayer } from '../core/layers';
 import { materials, type Layer, type LightPreset, type Project, type Vec3 } from '../core/project';
-import { spring, type Easing } from './easing';
-import { cameraId, defaultTimeline, frameTime, type Key, type Property, type TimelineData, type Track, type Value } from './timeline';
+import { ease, spring, type Easing } from './easing';
+import { cameraId, defaultTimeline, evaluate, frameTime, type Key, type Property, type TimelineData, type Track, type Value } from './timeline';
 
 export type PresetOptions = {
   duration: number; delay: number; intensity: number; direction: 'x' | 'y' | 'z' | '-x' | '-y' | '-z';
@@ -53,6 +53,26 @@ export const presets = {
 } satisfies Record<string, { label: string; group: string; recipe: Recipe }>;
 export type PresetId = keyof typeof presets;
 
+export function presetGraph(id: PresetId) {
+  const recipe: Recipe = presets[id].recipe;
+  const samples = recipe.position ?? recipe.radial ?? recipe.rotation ?? recipe.scale ?? recipe.opacity ??
+    recipe.squash ?? recipe.jitter ?? recipe.roughness ?? recipe.glow ?? pulse(0, 1);
+  const values = Array.from({ length: 33 }, (_, i) => {
+    const t = i / 32;
+    if (id === 'spring') return spring(t, 16, 0.43);
+    if (id === 'orbit') return Math.sin(t * Math.PI * 2);
+    const rightIndex = Math.max(1, samples.findIndex(([time]) => time >= t));
+    const [from, a] = samples[rightIndex - 1];
+    const [to, b] = samples[rightIndex];
+    const fraction = (t - from) / (to - from);
+    return a + (b - a) * (id === 'spin' || id === 'segments' ? fraction : ease(fraction, presetDefaults.easing));
+  });
+  const low = Math.min(...values);
+  const range = Math.max(0.001, Math.max(...values) - low);
+  return values.map((value, i) => (i ? 'L' : 'M') + (4 + i * 35 / 32).toFixed(2) + ' ' + (26 - 19 * (value - low) / range).toFixed(2)).join(' ');
+}
+
+
 export const templates = {
   splash: { label: 'Splash intro', light: 'dramatic', material: 'plastic', sequence: ['fade', 'wobble'] },
   onboarding: { label: 'Onboarding hero', light: 'soft', material: 'clay', sequence: ['assemble', 'float'] },
@@ -84,7 +104,8 @@ export function staggerRanks(ids: string[], order: PresetOptions['order']) {
 export function applyPreset(project: Project, id: PresetId, ids: string[], start: number, options: PresetOptions): Project {
   let timeline: TimelineData = project.timeline ?? defaultTimeline;
   const recipe: Recipe = presets[id].recipe;
-  const layers = project.layers.filter((layer) => ids.includes(layer.id) && !effectiveLayer(project, layer).locked);
+  const pose = evaluate(project, start);
+  const layers = pose.layers.filter((layer) => ids.includes(layer.id) && !effectiveLayer(project, layer).locked);
   const ranks = staggerRanks(layers.map((layer) => layer.id), options.order);
   const axis = axisIndex[options.direction.at(-1) as keyof typeof axisIndex];
   const sign = options.direction.startsWith('-') ? -1 : 1;
@@ -101,8 +122,8 @@ export function applyPreset(project: Project, id: PresetId, ids: string[], start
     if (distinct.size) generated.push({ target, property, keys: [...distinct.values()] });
   }
   if (recipe.camera) {
-    const origin = new Vector3(...project.camera.target);
-    const distance = new Vector3(...project.camera.position).sub(origin);
+    const origin = new Vector3(...pose.camera.target);
+    const distance = new Vector3(...pose.camera.position).sub(origin);
     const axisVector = new Vector3().setComponent(axis, sign);
     const samples: Samples = Array.from({ length: 33 }, (_, step) => [step / 32, step / 32]);
     channel(cameraId, 'position', start + options.delay, samples, (t) => distance.clone().applyQuaternion(

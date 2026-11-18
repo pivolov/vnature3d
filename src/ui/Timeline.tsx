@@ -115,6 +115,7 @@ export function Timeline({ project, target, layerName, disabled, time, seek, pla
   const [mode, setMode] = useState<'keys' | 'curve' | 'scene'>('keys');
   const clip = useRef<{ property: Property; key: Key } | undefined>(undefined);
   const gesture = useRef<{ pointer: number; source: number; property: Property; start: number; width: number } | undefined>(undefined);
+  const skipClick = useRef(false);
   const [dragTime, setDragTime] = useState<number | null>(null);
   const span = data.duration / zoom;
   const start = Math.min(origin, data.duration - span);
@@ -191,7 +192,7 @@ export function Timeline({ project, target, layerName, disabled, time, seek, pla
   }
   function moveKey(event: PointerEvent<HTMLButtonElement>) {
     const current = gesture.current;
-    if (!current) return;
+    if (!current || current.pointer !== event.pointerId) return;
     const next = frameTime(current.source + (event.clientX - current.start) / current.width * span, data, snap);
     setDragTime(next);
     seek(next);
@@ -201,6 +202,7 @@ export function Timeline({ project, target, layerName, disabled, time, seek, pla
     if (!target || !current || current.pointer !== event.pointerId) return;
     const next = frameTime(current.source + (event.clientX - current.start) / current.width * span, data, snap);
     if (!sameTime(next, current.source)) {
+      skipClick.current = true;
       update((timeline) => putKey(changeKeys(timeline, target, current.property, (keys) => keys.filter((item) =>
         !sameTime(item.time, current.source))), target, current.property, { ...key, time: next }));
       setFocus({ target, property: current.property, time: next });
@@ -255,9 +257,14 @@ export function Timeline({ project, target, layerName, disabled, time, seek, pla
               if (!moving && (percent < -0.0001 || percent > 100.0001)) return null;
               return <button key={key.time} className={'timeline-key' + ((tracks.find((item) => item.property === field)?.keys.length ?? 0) > zoom * 28 ? ' dense-key' : '')} type="button" style={{ left: percent + '%' }}
                 aria-label={nameOf(field) + ', ключ ' + key.time.toFixed(2) + ' с'} aria-pressed={keyframe === key}
-                onClick={() => { if (dragTime === null) { setChosen(field); setFocus({ target: target ?? '', property: field, time: key.time }); seek(key.time); } }}
+                onClick={() => {
+                  if (skipClick.current) { skipClick.current = false; return; }
+                  skipClick.current = false;
+                  setPlay(0); setChosen(field); setFocus({ target: target ?? '', property: field, time: key.time }); seek(key.time);
+                }}
                 onPointerDown={(event) => {
                   if (event.button !== 0 || disabled) return;
+                  skipClick.current = false;
                   setPlay(0); setChosen(field); setFocus({ target: target ?? '', property: field, time: key.time }); seek(key.time);
                   gesture.current = { pointer: event.pointerId, property: field, source: key.time, start: event.clientX, width: event.currentTarget.parentElement?.clientWidth ?? 1 };
                   event.currentTarget.setPointerCapture(event.pointerId);

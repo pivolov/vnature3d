@@ -1,9 +1,10 @@
 import {
-  Aperture, ArrowDownToLine, ChevronDown, FilePlus2, FolderOpen, Grid2X2, Layers3, SlidersHorizontal, Save, Video,
+  Aperture, ArrowDownToLine, ChevronDown, FilePlus2, FolderOpen, Grid2X2, PanelBottom, Pause, Play, Download, Layers3, SlidersHorizontal, Save, Video,
   Move, Orbit, Redo2, Undo2, Upload, X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { Timeline } from './Timeline';
+import { ExportDialog } from './ExportDialog';
 import { PresetLibrary, type PresetSelection } from './PresetLibrary';
 import { applyPreset, applyTemplate, presets, templates, type PresetOptions } from '../animation/presets';
 import { baseValue, cameraId, defaultTimeline, evaluate, frameTime, positionAt, putKey, type Property, type TimelineData } from '../animation/timeline';
@@ -144,6 +145,10 @@ export function App() {
   const importSequence = useRef(0);
   const dragDepth = useRef(0);
   const [dragging, setDragging] = useState(false);
+  const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
+  const [timelineVisible, setTimelineVisible] = useState(true);
+  const [inspect, setInspect] = useState<'layer' | 'scene'>('layer');
+  const [exportOpen, setExportOpen] = useState(false);
   const [grid, setGrid] = useState(true);
   const [gizmo, setGizmo] = useState(false);
   const [error, setError] = useState('');
@@ -241,15 +246,16 @@ export function App() {
   useEffect(() => {
     if (!play) return;
     const duration = sceneTimeline.duration;
-    const origin = sceneTimeline.loop === 'ping-pong' && play < 0 ? 2 * duration - resumeTime.current : resumeTime.current;
+    const origin = resumeTime.current;
     const start = performance.now();
     let frame = 0;
     function tick(now: number) {
       const elapsed = (now - start) / 1000;
-      const raw = origin + elapsed * (sceneTimeline.loop === 'ping-pong' ? 1 : play);
+      const raw = origin + elapsed * play;
       const next = positionAt(raw, duration, sceneTimeline.loop);
       timeRef.current = next;
-      resumeTime.current = next;
+      const span = sceneTimeline.loop === 'ping-pong' ? duration * 2 : duration;
+      resumeTime.current = sceneTimeline.loop === 'once' ? next : (raw % span + span) % span;
       setTime(next);
       if (sceneTimeline.loop === 'once' && (raw >= duration || raw <= 0)) setPlay(0);
       else frame = requestAnimationFrame(tick);
@@ -265,7 +271,7 @@ export function App() {
     if (!host.current) return;
     try {
       viewport.current = mountViewport(host.current, {
-        select,
+        select: selectLayer,
         move: (id, position) => actions.current?.layer(id, { position }),
         orbit: (position, target, zoom) => actions.current?.camera({ position, target, zoom }),
       });
@@ -276,11 +282,11 @@ export function App() {
       viewport.current?.dispose();
       viewport.current = null;
     };
-  }, [select]);
+  }, [selectLayer]);
 
   useEffect(() => {
-    viewport.current?.update(previewPose || pose, selectedId, grid, gizmo && !play && !previewPose);
-  }, [pose, previewPose, selectedId, grid, gizmo, play]);
+    viewport.current?.update(previewPose || pose, selectedId, grid && viewMode === 'edit', gizmo && !play && !previewPose && viewMode === 'edit');
+  }, [pose, previewPose, selectedId, grid, gizmo, play, viewMode]);
 
   useEffect(() => {
     function shortcuts(event: KeyboardEvent) {
@@ -320,7 +326,7 @@ export function App() {
   function showMotion(request: { selection: PresetSelection; options: PresetOptions; all: boolean } | null) {
     if (!request) { setPreview(null); return; }
     const { selection, options, all } = request;
-    const base = { ...project, timeline: { ...defaultTimeline, fps: sceneTimeline.fps, duration: 0.1 } };
+    const base = { ...evaluate(project, time), timeline: { ...defaultTimeline, fps: sceneTimeline.fps, duration: 0.1 } };
     const temporary = applyMotion(base, selection, options, all, 0);
     if (temporary === base) return;
     setPreviewTime(0);
@@ -392,7 +398,7 @@ export function App() {
     editCamera({ preset, position: cameraPositions[preset], target: [0, 0, 0], zoom: 1 });
   }
 
-  return <div className="studio" data-mobile-panel={mobilePanel ?? undefined}
+  return <div className="studio" data-mobile-panel={mobilePanel ?? undefined} data-mode={viewMode} data-timeline={timelineVisible}
     onDragEnter={(event) => {
       if (!event.dataTransfer.types.includes('Files')) return;
       event.preventDefault();
@@ -415,6 +421,10 @@ export function App() {
         <IconButton label="Отменить" disabled={!past.length} onClick={undo}><Undo2 size={17} /></IconButton>
         <IconButton label="Повторить" disabled={!future.length} onClick={redo}><Redo2 size={17} /></IconButton>
       </div>
+      <div className="editor-modes" aria-label="Режим редактора">
+        <button aria-pressed={viewMode === 'edit'} onClick={() => { setViewMode('edit'); setPreview(null); }}>Редактор</button>
+        <button aria-pressed={viewMode === 'preview'} onClick={() => { setViewMode('preview'); setMobilePanel(null); setPreview(null); }}>Просмотр</button>
+      </div>
       <input type="file" aria-label="Файл проекта" accept=".l3d" ref={projectField} hidden onChange={(event) => {
         const file = event.currentTarget.files?.[0]; event.currentTarget.value = '';
         if (file) void openProject(file);
@@ -429,7 +439,11 @@ export function App() {
           event.currentTarget.value = '';
           if (file) void loadFile(file);
         }} />
-      <button className="primary" onClick={() => fileField.current?.click()}><ArrowDownToLine size={16} />Импорт</button>
+      <div className="topbar-end">
+        <button className="secondary import-action" aria-label="Импорт" title="Импорт изображения" onClick={() => fileField.current?.click()}><ArrowDownToLine size={16} /><span>Импорт</span></button>
+        <button className="primary export-action" aria-label="Экспорт" title="Экспорт сцены" disabled={!project.layers.length || !!graphicsError}
+          onClick={() => { setPlay(0); setPreview(null); setExportOpen(true); }}><Download size={16} /><span>Экспорт</span></button>
+      </div>
     </header>
 
     <div className="workspace">
@@ -450,6 +464,7 @@ export function App() {
             if (result === project) { setError('Выберите видимый слой или уменьшите задержку.'); return; }
             setError(''); change(() => result);
             setCameraTrack(selection.id === 'orbit');
+            setTimelineVisible(true);
             seek(start);
           }} />}
         {side === 'create' && <><PrimitiveEditor key={project.name} layers={effectiveLayers} selected={selected}
@@ -483,7 +498,9 @@ export function App() {
         <div className="canvas-header">
           <div className="document"><h1 title={project.name}>{project.name}</h1>{preview && <span className="preview-label">Предпросмотр · {preview.label}</span>}</div>
           <div className="canvas-tools">
-            <IconButton label="Дорожки камеры" pressed={cameraTrack} onClick={() => setCameraTrack(!cameraTrack)}><Video size={17} /></IconButton>
+            <IconButton label={timelineVisible ? 'Свернуть таймлайн' : 'Показать таймлайн'} pressed={timelineVisible}
+              onClick={() => setTimelineVisible(!timelineVisible)}><PanelBottom size={17} /></IconButton>
+            <IconButton label="Дорожки камеры" pressed={cameraTrack} onClick={() => { setCameraTrack(!cameraTrack); setTimelineVisible(true); setInspect('scene'); }}><Video size={17} /></IconButton>
             <IconButton label="Сетка" pressed={grid} onClick={() => setGrid(!grid)}><Grid2X2 size={17} /></IconButton>
             <IconButton label="Гизмо перемещения" pressed={gizmo} onClick={() => setGizmo(!gizmo)}><Move size={17} /></IconButton>
           </div>
@@ -499,6 +516,14 @@ export function App() {
           <div>{error || project.notices.join(' ')}</div>
           {error && <IconButton label="Закрыть сообщение" onClick={() => setError('')}><X size={15} /></IconButton>}
         </div>}
+        {viewMode === 'preview' && <div className="preview-transport">
+          <button className="secondary" onClick={() => playback(play ? 0 : 1)} aria-label={play ? 'Пауза просмотра' : 'Воспроизвести просмотр'}>
+            {play ? <Pause size={17} /> : <Play size={17} />}
+          </button>
+          <input aria-label="Время просмотра" type="range" min={0} max={sceneTimeline.duration} step={1 / sceneTimeline.fps} value={time}
+            onChange={(event) => { setPlay(0); seek(event.currentTarget.valueAsNumber); }} />
+          <output>{time.toFixed(2)} с</output>
+        </div>}
         <div className="canvas-footer">
           <div className="view-switch" aria-label="Ракурс камеры">
             {(Object.keys(angles) as CameraPreset[]).map((preset) =>
@@ -509,10 +534,15 @@ export function App() {
       </main>
 
       <aside className="inspector" aria-label="Инспектор">
-        <div className="panel-title"><Aperture size={16} />Настройки</div>
+        <div className="panel-tabs inspector-tabs">
+          <button aria-pressed={inspect === 'layer'} onClick={() => setInspect('layer')}>Объект</button>
+          <button aria-pressed={inspect === 'scene'} onClick={() => setInspect('scene')}>Сцена</button>
+        </div>
         <div className="settings-scroll">
-        {selected && (selected.locked ? <p className="muted-empty">Слой заблокирован.</p> : <LayerInspector key={selected.id} layer={selected} set={(patch) => editLayer(selected.id, patch)} />)}
-        <Section title="Свет и камера">
+        {inspect === 'layer' && !selected && <p className="muted-empty">Выберите объект во вьюпорте или на панели слоёв.</p>}
+        {inspect === 'layer' && selected && <div className="inspector-object"><span className="swatch" style={{ background: selected.color }} />{selected.name}</div>}
+        {inspect === 'layer' && selected && (selected.locked ? <p className="muted-empty">Слой заблокирован.</p> : <LayerInspector key={selected.id} layer={selected} set={(patch) => editLayer(selected.id, patch)} />)}
+        {inspect === 'scene' && <Section title="Свет и камера" expanded>
           <label className="field"><span>Свет</span><select value={project.light} onChange={(event) => {
             const light = event.target.value as LightPreset;
             change((current) => ({ ...current, light }));
@@ -525,7 +555,7 @@ export function App() {
           }}>
             <option value="perspective">Перспектива</option><option value="orthographic">Ортографическая</option>
           </select></label>
-        </Section>
+        </Section>}
         </div>
       </aside>
     </div>
@@ -535,6 +565,7 @@ export function App() {
       autoKey={autoKey} setAutoKey={setAutoKey} update={updateTimeline} />
     <footer className="statusbar"><span>{storageStatus || 'Локальный проект'}</span>
       <span>{effectiveLayers.filter((layer) => layer.visible).length} / {project.layers.length} видимых слоёв</span></footer>
+    {exportOpen && <ExportDialog project={project} time={time} close={() => setExportOpen(false)} />}
     {raster && <RasterDialog source={raster} onCancel={() => setRaster(null)} onApply={(layers) => {
       resetTime();
       change(() => ({ ...emptyProject, name: raster.name, layers }));

@@ -1,5 +1,4 @@
 import { difference, intersection, union, type MultiPolygon, type Polygon, type Ring } from 'polygon-clipping';
-import { parse } from 'opentype.js';
 import type { Layer, Shape, Vec2 } from '../core/project';
 import { importSvg } from './svg';
 
@@ -21,7 +20,8 @@ export function primitiveShape(kind: Primitive, sides: number): Shape {
   return { outer, holes: [] };
 }
 
-export function textShapes(text: string, fontData: ArrayBuffer) {
+export async function textShapes(text: string, fontData: ArrayBuffer) {
+  const { parse } = await import('opentype.js');
   const font = parse(fontData);
   const missing = [...new Set([...text].filter((char) => char.trim() && !font.hasChar(char)))];
   if (missing.length) throw new Error('В шрифте нет символов: ' + missing.join(' '));

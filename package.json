@@ -21,8 +21,10 @@
   "homepage": "https://github.com/pivolov/vnature3d#readme",
   "private": true,
   "dependencies": {
+    "fflate": "0.8.3",
     "fit-curve": "0.2.0",
     "lucide-react": "1.75.0",
+    "mp4-muxer": "5.2.2",
     "opentype.js": "2.0.0",
     "polygon-clipping": "0.15.7",
     "react": "19.3.1",
