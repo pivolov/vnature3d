@@ -12,7 +12,7 @@ type PathData = {
 };
 
 function sample(path: { getPoints: (divisions: number) => Vector2[] }): Vec2[] {
-  const points = path.getPoints(24);
+  const points = path.getPoints(48);
   if (points.length > 1 && points[0].equals(points[points.length - 1])) points.pop();
   return points.map(({ x, y }) => [x, -y]);
 }
@@ -85,7 +85,7 @@ export function importSvg(source: string): { layers: Layer[]; notices: string[] 
       layers.set(key, {
         id: 'layer-' + (layers.size + 1), name: node.getAttribute('id') || 'Заливка ' + (layers.size + 1),
         shapes, color, opacity, material: 'clay', visible: true,
-        depth: 0.55, bevel: 0.045, bevelSegments: 3,
+        depth: 0.55, bevel: 0.045, bevelSegments: 6,
         position: [0, 0, layers.size * 0.025], rotation: [0, 0, 0],
       });
     }

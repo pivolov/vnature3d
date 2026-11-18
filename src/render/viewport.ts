@@ -1,12 +1,11 @@
 import {
-  AmbientLight, BoxHelper, Color, DirectionalLight, ExtrudeGeometry, GridHelper, Mesh, MeshPhysicalMaterial, NeutralToneMapping,
-  OrthographicCamera, Path, PerspectiveCamera, PMREMGenerator, Raycaster, Scene, Shape, Vector2, WebGLRenderer,
+  AmbientLight, BoxHelper, Color, DirectionalLight, DoubleSide, FrontSide, BufferGeometry, GridHelper, Mesh, MeshPhysicalMaterial, NeutralToneMapping,
+  OrthographicCamera, PerspectiveCamera, PMREMGenerator, Raycaster, Scene, Vector2, WebGLRenderer,
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
-import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { materials, type Layer, type Project, type Vec2, type Vec3 } from '../core/project';
+import { materials, type Layer, type Project, type Vec3 } from '../core/project';
 
 type Callbacks = {
   select: (id: string) => void;
@@ -14,35 +13,15 @@ type Callbacks = {
   orbit: (position: Vec3, target: Vec3, zoom: number) => void;
 };
 
+import { effectiveLayer } from '../core/layers';
+import { extrudeLayer } from '../geometry/extrusion';
+
 const lighting = {
-  studio: { ambient: 1.4, key: 3, fill: 1.1, rim: 2.1, tint: '#b5a2ff' },
+  studio: { ambient: 1.4, key: 3, fill: 1.1, rim: 2.1, tint: '#ffffff' },
   soft: { ambient: 2, key: 1.6, fill: 1.2, rim: 0.8, tint: '#ffffff' },
   dramatic: { ambient: 0.35, key: 4.3, fill: 0.2, rim: 3, tint: '#ffd2aa' },
   neon: { ambient: 0.65, key: 2.1, fill: 1.2, rim: 4, tint: '#ed6eff' },
 };
-
-function outline(path: Path, points: Vec2[]) {
-  path.moveTo(...points[0]);
-  for (const point of points.slice(1)) path.lineTo(...point);
-  path.closePath();
-  return path;
-}
-
-function geometry(layer: Layer) {
-  const shapes = layer.shapes.map(({ outer, holes }) => {
-    const shape = new Shape();
-    outline(shape, outer);
-    shape.holes = holes.map((hole) => outline(new Path(), hole));
-    return shape;
-  });
-  const result = new ExtrudeGeometry(shapes, {
-    depth: layer.depth, bevelEnabled: layer.bevel > 0, bevelSize: layer.bevel,
-    bevelThickness: layer.bevel, bevelSegments: layer.bevelSegments,
-  });
-  result.translate(0, 0, -layer.depth / 2);
-  toCreasedNormals(result, 0.48);
-  return result;
-}
 
 function sameVector(a: Vec3, b: Vec3) {
   return a.every((value, i) => Math.abs(value - b[i]) < 1e-6);
@@ -70,13 +49,13 @@ export function mountViewport(host: HTMLDivElement, callbacks: Callbacks) {
   transform.setSize(0.74);
   scene.add(transform.getHelper());
 
-  const grid = new GridHelper(24, 48, '#46444e', '#302e37');
+  const grid = new GridHelper(24, 48, '#424242', '#272727');
   grid.position.y = -2.2;
   scene.add(grid);
-  const ambient = new AmbientLight('#eae6ff');
-  const key = new DirectionalLight('#fff6e8');
+  const ambient = new AmbientLight('#f5f5f5');
+  const key = new DirectionalLight('#fffaf4');
   key.position.set(3, 5, 5);
-  const fill = new DirectionalLight('#b3d5ff');
+  const fill = new DirectionalLight('#ededed');
   fill.position.set(-4, 1, 4);
   const rim = new DirectionalLight();
   rim.position.set(1, 3, -5);
@@ -90,7 +69,7 @@ export function mountViewport(host: HTMLDivElement, callbacks: Callbacks) {
   room.dispose();
   pmrem.dispose();
 
-  const meshes = new Map<string, { layer: Layer; mesh: Mesh<ExtrudeGeometry, MeshPhysicalMaterial> }>();
+  const meshes = new Map<string, { layer: Layer; mesh: Mesh<BufferGeometry, MeshPhysicalMaterial> }>();
   const bounds = new BoxHelper(grid, new Color('#c9ef88'));
   bounds.visible = false;
   scene.add(bounds);
@@ -157,7 +136,7 @@ export function mountViewport(host: HTMLDivElement, callbacks: Callbacks) {
     if (!picking || start.distanceTo(new Vector2(event.clientX, event.clientY)) > 4) return;
     const rect = renderer.domElement.getBoundingClientRect();
     ray.setFromCamera(new Vector2(2 * (event.clientX - rect.left) / rect.width - 1, 1 - 2 * (event.clientY - rect.top) / rect.height), camera);
-    const hit = ray.intersectObjects([...meshes.values()].map(({ mesh }) => mesh).filter((mesh) => mesh.visible), false)[0];
+    const hit = ray.intersectObjects([...meshes.values()].map(({ mesh }) => mesh).filter((mesh) => mesh.visible && !meshes.get(mesh.name)?.layer.locked), false)[0];
     if (hit) callbacks.select(hit.object.name);
   });
 
@@ -190,21 +169,22 @@ export function mountViewport(host: HTMLDivElement, callbacks: Callbacks) {
         mesh.material.dispose();
         meshes.delete(id);
       }
-      for (const layer of project.layers) {
+      for (const sourceLayer of project.layers) {
+        const layer = effectiveLayer(project, sourceLayer);
         const previous = meshes.get(layer.id);
         if (previous?.layer === layer) continue;
-        const mesh = previous?.mesh ?? new Mesh(geometry(layer), new MeshPhysicalMaterial());
+        const mesh = previous?.mesh ?? new Mesh(extrudeLayer(layer), new MeshPhysicalMaterial());
         if (!previous) {
           mesh.name = layer.id;
           scene.add(mesh);
-        } else if (previous.layer.shapes !== layer.shapes || previous.layer.depth !== layer.depth ||
+        } else if (previous.layer.shapes !== layer.shapes || previous.layer.relief !== layer.relief || previous.layer.depth !== layer.depth ||
           previous.layer.bevel !== layer.bevel || previous.layer.bevelSegments !== layer.bevelSegments) {
           mesh.geometry.dispose();
-          mesh.geometry = geometry(layer);
+          mesh.geometry = extrudeLayer(layer);
         }
         const { roughness, metalness, clearcoat } = materials[layer.material];
         mesh.material.setValues({ color: layer.material === 'gold' ? '#eec269' : layer.color, roughness, metalness, clearcoat,
-          opacity: layer.opacity, transparent: layer.opacity < 1, depthWrite: layer.opacity === 1 });
+          side: layer.relief ? DoubleSide : FrontSide, opacity: layer.opacity, transparent: layer.opacity < 1, depthWrite: layer.opacity === 1 });
         mesh.material.needsUpdate = true;
         mesh.position.set(...layer.position);
         mesh.rotation.set(...layer.rotation);
@@ -212,7 +192,8 @@ export function mountViewport(host: HTMLDivElement, callbacks: Callbacks) {
         meshes.set(layer.id, { layer, mesh });
       }
 
-      const next = selectedId ? meshes.get(selectedId)?.mesh : undefined;
+      const entry = selectedId ? meshes.get(selectedId) : undefined;
+      const next = entry?.layer.locked ? undefined : entry?.mesh;
       if (selected !== next || gizmo !== showGizmo || transform.object?.visible === false || (showGizmo && next?.visible && !transform.object)) {
         transform.detach();
         if (showGizmo && next?.visible) transform.attach(next);

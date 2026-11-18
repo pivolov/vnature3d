@@ -1,9 +1,13 @@
 import {
-  Aperture, ArrowDownToLine, Box, ChevronDown, Circle, Eye, EyeOff, FilePlus2, Grid2X2, Layers3,
+  Aperture, ArrowDownToLine, Box, ChevronDown, Circle, FilePlus2, Grid2X2, Layers3,
   Move, Orbit, Redo2, Undo2, Upload, X,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { createEditor } from '../core/editor';
+import { effectiveLayer } from '../core/layers';
+import { LayerTree } from './LayerTree';
+import { PrimitiveEditor } from './PrimitiveEditor';
+import { decodeRaster, RasterDialog, type RasterSource } from './RasterDialog';
 import { cameraPositions, emptyProject, materials, type CameraPreset, type Layer, type LightPreset, type Vec3 } from '../core/project';
 import { demos } from '../geometry/demos';
 import { importSvg, maxSvgBytes } from '../geometry/svg';
@@ -59,10 +63,10 @@ function LayerInspector({ layer }: { layer: Layer }) {
 
   return <>
     <Section title="Геометрия">
-      <NumberField label="Глубина" value={layer.depth} min={0.01} max={3} step={0.05} onCommit={(depth) => set({ depth })} />
-      <NumberField label="Фаска" value={layer.bevel} min={0} max={0.35} onCommit={(bevel) => set({ bevel })} />
+      <NumberField label={layer.relief ? "Высота рельефа" : "Глубина"} value={layer.depth} min={0.01} max={3} step={0.05} onCommit={(depth) => set({ depth })} />
+      {!layer.relief && <><NumberField label="Фаска" value={layer.bevel} min={0} max={0.35} onCommit={(bevel) => set({ bevel })} />
       <NumberField label="Сегменты фаски" value={layer.bevelSegments} min={1} max={8} step={1}
-        onCommit={(bevelSegments) => set({ bevelSegments })} />
+        onCommit={(bevelSegments) => set({ bevelSegments })} /></>}
     </Section>
     <Section title="Материал">
       <label className="field"><span>Пресет</span><select value={layer.material}
@@ -92,7 +96,9 @@ function LayerInspector({ layer }: { layer: Layer }) {
 
 export function App() {
   const { project, selectedId, change, select, updateLayer, past, future, undo, redo } = useEditor();
-  const selected = project.layers.find((layer) => layer.id === selectedId);
+  const selectedSource = project.layers.find((layer) => layer.id === selectedId);
+  const selected = selectedSource && effectiveLayer(project, selectedSource);
+  const effectiveLayers = project.layers.map((layer) => effectiveLayer(project, layer));
   const fileField = useRef<HTMLInputElement>(null);
   const host = useRef<HTMLDivElement>(null);
   const viewport = useRef<ReturnType<typeof mountViewport> | null>(null);
@@ -102,6 +108,7 @@ export function App() {
   const [grid, setGrid] = useState(true);
   const [gizmo, setGizmo] = useState(false);
   const [error, setError] = useState('');
+  const [raster, setRaster] = useState<RasterSource | null>(null);
   const [graphicsError, setGraphicsError] = useState('');
 
   useEffect(() => {
@@ -150,8 +157,14 @@ export function App() {
 
   async function loadFile(file: File) {
     const request = ++importSequence.current;
+    setError('');
     try {
-      if (!/\.svg$/i.test(file.name) && file.type !== 'image/svg+xml') throw new Error('Выберите SVG-файл.');
+      if (/\.(png|jpe?g)$/i.test(file.name) || ['image/png', 'image/jpeg'].includes(file.type)) {
+        const source = await decodeRaster(file);
+        if (request === importSequence.current) setRaster(source);
+        return;
+      }
+      if (!/\.svg$/i.test(file.name) && file.type !== 'image/svg+xml') throw new Error('Выберите файл SVG, PNG или JPG.');
       if (file.size > maxSvgBytes) throw new Error('SVG превышает 1 МБ. Упростите исходный файл.');
       const source = await file.text();
       if (request === importSequence.current) loadSource(file.name.replace(/\.svg$/i, ''), source);
@@ -161,6 +174,7 @@ export function App() {
   }
 
   function drop(event: DragEvent) {
+    if (!event.dataTransfer.types.includes('Files')) return;
     event.preventDefault();
     dragDepth.current = 0;
     setDragging(false);
@@ -175,6 +189,7 @@ export function App() {
 
   function newProject() {
     importSequence.current++;
+    setRaster(null);
     setError('');
     change(() => emptyProject);
   }
@@ -204,30 +219,36 @@ export function App() {
         <IconButton label="Отменить" disabled={!past.length} onClick={undo}><Undo2 size={17} /></IconButton>
         <IconButton label="Повторить" disabled={!future.length} onClick={redo}><Redo2 size={17} /></IconButton>
       </div>
-      <input type="file" aria-label="Выбрать SVG" accept=".svg,image/svg+xml" ref={fileField} hidden
+      <input type="file" aria-label="Выбрать изображение" accept=".svg,.png,.jpg,.jpeg,image/svg+xml,image/png,image/jpeg" ref={fileField} hidden
         onChange={(event) => {
           const file = event.currentTarget.files?.[0];
           event.currentTarget.value = '';
           if (file) void loadFile(file);
         }} />
-      <button className="primary" onClick={() => fileField.current?.click()}><ArrowDownToLine size={16} />Импорт SVG</button>
+      <button className="primary" onClick={() => fileField.current?.click()}><ArrowDownToLine size={16} />Импорт</button>
     </header>
 
     <div className="workspace">
       <aside className="sidebar" aria-label="Слои и примеры">
         <div className="panel-title"><Layers3 size={16} />Слои<span className="count">{project.layers.length}</span></div>
-        <div className="layer-list">
-          {project.layers.map((layer) => <div key={layer.id} className={'layer' + (layer.id === selectedId ? ' selected' : '')}>
-            <button className="layer-label" aria-pressed={layer.id === selectedId} onClick={() => select(layer.id)}>
-              <span className="swatch" style={{ backgroundColor: layer.material === 'gold' ? '#eec269' : layer.color }} />
-              <span>{layer.name}</span>
-            </button>
-            <IconButton label={(layer.visible ? 'Скрыть ' : 'Показать ') + layer.name} onClick={() => updateLayer(layer.id, { visible: !layer.visible })}>
-              {layer.visible ? <Eye size={15} /> : <EyeOff size={15} />}
-            </IconButton>
-          </div>)}
-          {!project.layers.length && <p className="muted-empty">Импортируйте SVG или откройте пример.</p>}
-        </div>
+        <LayerTree project={project} selectedId={selectedId} change={change} select={select} />
+        <PrimitiveEditor key={project.name} layers={effectiveLayers} selected={selected}
+          onAdd={(layer) => {
+            setError('');
+            change((current) => ({ ...current, layers: [...current.layers, {
+              ...layer, position: current.layers.length ? [0.55, -0.35, 0.15] : layer.position,
+            }] }));
+            select(layer.id);
+          }}
+          onCombine={(first, second, layer) => {
+            setError('');
+            change((current) => ({ ...current, layers: [
+              ...current.layers.map((item) => item.id === first || item.id === second ? { ...item, visible: false } : item),
+              layer,
+            ] }));
+            select(layer.id);
+          }}
+          onError={setError} />
         <div className="demo-list">
           <h2>Примеры</h2>
           {demos.map((item, index) => {
@@ -248,7 +269,7 @@ export function App() {
         <div className="viewport-host" ref={host} />
         {!project.layers.length && !graphicsError && <div className="empty-canvas">
           <Upload size={29} />
-          <h2>Перетащите SVG сюда</h2>
+          <h2>Перетащите SVG, PNG или JPG</h2>
           <button className="secondary" onClick={() => fileField.current?.click()}>Выбрать файл</button>
         </div>}
         {graphicsError && <div className="empty-canvas" role="alert">{graphicsError}</div>}
@@ -267,7 +288,7 @@ export function App() {
 
       <aside className="inspector" aria-label="Инспектор">
         <div className="panel-title"><Aperture size={16} />Инспектор</div>
-        {selected && <LayerInspector key={selected.id} layer={selected} />}
+        {selected && (selected.locked ? <p className="muted-empty">Слой заблокирован.</p> : <LayerInspector key={selected.id} layer={selected} />)}
         <Section title="Свет и камера">
           <label className="field"><span>Свет</span><select value={project.light} onChange={(event) => {
             const light = event.target.value as LightPreset;
@@ -286,7 +307,12 @@ export function App() {
     </div>
 
     <footer className="statusbar"><span><Circle size={7} fill="currentColor" />{graphicsError ? 'WebGL недоступен' : 'Локальный предпросмотр'}</span>
-      <span>{project.layers.filter((layer) => layer.visible).length} / {project.layers.length} видимых слоёв</span></footer>
-    {dragging && <div className="drop-target"><Upload size={32} />Отпустите SVG для импорта</div>}
+      <span>{effectiveLayers.filter((layer) => layer.visible).length} / {project.layers.length} видимых слоёв</span></footer>
+    {raster && <RasterDialog source={raster} onCancel={() => setRaster(null)} onApply={(layers) => {
+      change(() => ({ ...emptyProject, name: raster.name, layers }));
+      select(layers[0].id);
+      setRaster(null);
+    }} />}
+    {dragging && <div className="drop-target"><Upload size={32} />Отпустите изображение для импорта</div>}
   </div>;
 }

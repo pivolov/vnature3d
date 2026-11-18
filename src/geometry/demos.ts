@@ -1,7 +1,7 @@
 export const demos = [
   {
     name: 'Орбита',
-    svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path id="Орбита" fill="#a086ff" fill-rule="evenodd" d="M50 7C74 7 93 26 93 50S74 93 50 93 7 74 7 50 26 7 50 7ZM50 20C33 20 20 33 20 50S33 80 50 80 80 67 80 50 67 20 50 20Z"/><path id="Искра" fill="#e6fa9c" d="M50 28Q54 46 72 50 54 54 50 72 46 54 28 50 46 46 50 28Z"/></svg>',
+    svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path id="Орбита" fill="#69b8dd" fill-rule="evenodd" d="M50 7C74 7 93 26 93 50S74 93 50 93 7 74 7 50 26 7 50 7ZM50 20C33 20 20 33 20 50S33 80 50 80 80 67 80 50 67 20 50 20Z"/><path id="Искра" fill="#d6f494" d="M50 28Q54 46 72 50 54 54 50 72 46 54 28 50 46 46 50 28Z"/></svg>',
   },
   {
     name: 'Стрела',

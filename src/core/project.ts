@@ -17,6 +17,10 @@ export type Layer = {
   id: string;
   name: string;
   shapes: Shape[];
+  relief?: { width: number; height: number; heights: number[] };
+  parentId?: string;
+  order?: number;
+  locked?: boolean;
   color: string;
   material: keyof typeof materials;
   opacity: number;
@@ -31,10 +35,20 @@ export type Layer = {
 export type CameraPreset = 'studio' | 'front' | 'top' | 'iso';
 export type LightPreset = 'studio' | 'soft' | 'dramatic' | 'neon';
 
+export type LayerGroup = {
+  id: string;
+  name: string;
+  parentId?: string;
+  order?: number;
+  visible: boolean;
+  locked?: boolean;
+};
+
 export type Project = {
   schemaVersion: 1;
   name: string;
   layers: Layer[];
+  groups?: LayerGroup[];
   notices: string[];
   light: LightPreset;
   camera: { preset: CameraPreset; projection: 'perspective' | 'orthographic'; position: Vec3; target: Vec3; zoom: number };

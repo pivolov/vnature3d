@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { treeItems } from './layers';
 import { emptyProject, type Layer, type Project } from './project';
 
 type Editor = {
@@ -14,7 +15,7 @@ type Editor = {
 };
 
 function selection(project: Project, id: string | null) {
-  return project.layers.some((layer) => layer.id === id) ? id : project.layers[0]?.id ?? null;
+  return treeItems(project).some(({ node }) => node.id === id) ? id : project.layers[0]?.id ?? project.groups?.[0]?.id ?? null;
 }
 
 export function createEditor(project = emptyProject) {
