@@ -1,4 +1,4 @@
-import { AmbientLight, BufferGeometry, DirectionalLight, DoubleSide, FrontSide, Mesh, MeshPhysicalMaterial,
+import { AmbientLight, Box3, Vector3, PCFShadowMap, BufferGeometry, DirectionalLight, DoubleSide, FrontSide, Mesh, MeshPhysicalMaterial,
   NeutralToneMapping, OrthographicCamera, PerspectiveCamera, PMREMGenerator, Scene, WebGLRenderer } from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { effectiveLayer } from '../core/layers';
@@ -6,7 +6,7 @@ import { defaultLighting, keyDirection, materials, type Layer, type Project } fr
 import { extrudeLayer } from '../geometry/extrusion';
 
 const lighting = {
-  studio: { ambient: 1.4, key: 3, fill: 1.1, rim: 2.1, tint: '#ffffff' },
+  studio: { ambient: 0.95, key: 3.2, fill: 0.9, rim: 2.1, tint: '#ffffff' },
   soft: { ambient: 2, key: 1.6, fill: 1.2, rim: 0.8, tint: '#ffffff' },
   dramatic: { ambient: 0.35, key: 4.3, fill: 0.2, rim: 3, tint: '#ffd2aa' },
   neon: { ambient: 0.65, key: 2.1, fill: 1.2, rim: 4, tint: '#ed6eff' },
@@ -38,11 +38,18 @@ export function createProjectScene(renderer: WebGLRenderer) {
   fill.position.set(-4, 1, 4);
   const rim = new DirectionalLight();
   rim.position.set(1, 3, -5);
-  scene.add(ambient, key, fill, rim);
+  scene.add(ambient, key, key.target, fill, rim);
+  renderer.shadowMap.type = PCFShadowMap;
+  key.shadow.mapSize.set(1024, 1024);
+  key.shadow.normalBias = 0.006;
+  key.shadow.bias = -0.00015;
+  const bounds = new Box3();
+  const center = new Vector3();
+  const extent = new Vector3();
 
   const pmrem = new PMREMGenerator(renderer);
   const room = new RoomEnvironment();
-  const environment = pmrem.fromScene(room, 0.04);
+  const environment = pmrem.fromScene(room, 0.025);
   scene.environment = environment.texture;
   scene.environmentIntensity = 0.82;
   room.dispose();
@@ -80,6 +87,14 @@ export function createProjectScene(renderer: WebGLRenderer) {
     update(project: Project) {
       const preset = lighting[project.light];
       const settings = project.lighting ?? defaultLighting;
+      scene.environmentIntensity = 0.82 * (settings.reflections ?? 1);
+      const studioAngle = (settings.studioAngle ?? 0) * Math.PI / 180;
+      scene.environmentRotation.set(0, studioAngle, 0);
+      renderer.toneMappingExposure = 0.8 * (settings.exposure ?? 1);
+      const shadows = settings.shadows ?? false;
+      renderer.shadowMap.enabled = shadows;
+      key.castShadow = shadows;
+      key.target.position.set(0, 0, 0);
       key.position.set(...keyDirection(settings));
       ambient.intensity = preset.ambient * settings.fill;
       key.intensity = preset.key * settings.strength;
@@ -98,6 +113,10 @@ export function createProjectScene(renderer: WebGLRenderer) {
       for (const sourceLayer of project.layers) {
         const layer = effectiveLayer(project, sourceLayer);
         const previous = meshes.get(layer.id);
+        if (previous && layer.shine !== undefined) {
+          previous.mesh.material.envMapIntensity = scene.environmentIntensity;
+          previous.mesh.material.envMapRotation.set(0, studioAngle + layer.shine, 0);
+        }
         if (previous?.layer === layer) continue;
         const mesh = previous?.mesh ?? new Mesh(acquire(layer), new MeshPhysicalMaterial());
         if (!previous) {
@@ -119,7 +138,7 @@ export function createProjectScene(renderer: WebGLRenderer) {
           if (mesh.material.side !== side || mesh.material.transparent !== transparent || mesh.material.envMap !== map) mesh.material.needsUpdate = true;
           mesh.material.envMap = map;
           mesh.material.envMapIntensity = scene.environmentIntensity;
-          mesh.material.envMapRotation.set(0.16, layer.shine ?? 0, 0.1);
+          mesh.material.envMapRotation.set(0, studioAngle + (layer.shine ?? 0), 0);
           mesh.material.setValues({ color: layer.color, emissive: layer.emissive ?? '#000000',
             roughness: layer.roughness ?? roughness, metalness, clearcoat, side, opacity: layer.opacity, transparent, depthWrite: !transparent });
         }
@@ -127,9 +146,22 @@ export function createProjectScene(renderer: WebGLRenderer) {
         mesh.scale.set(...(layer.scale ?? [1, 1, 1]));
         mesh.rotation.set(...layer.rotation);
         mesh.visible = layer.visible;
+        mesh.castShadow = layer.opacity >= 1;
+        mesh.receiveShadow = true;
         meshes.set(layer.id, { layer, mesh });
       }
-
+      if (shadows) {
+        bounds.makeEmpty();
+        for (const { mesh } of meshes.values()) if (mesh.visible && mesh.material.opacity > 0) bounds.expandByObject(mesh);
+        if (!bounds.isEmpty()) {
+          bounds.getCenter(center);
+          const radius = Math.max(0.25, bounds.getSize(extent).length() * 0.52);
+          key.target.position.copy(center);
+          key.position.multiplyScalar(2 * radius).add(center);
+          Object.assign(key.shadow.camera, { left: -radius, right: radius, top: radius, bottom: -radius, near: 0.01, far: radius * 3.1 });
+          key.shadow.camera.updateProjectionMatrix();
+        }
+      }
     },
     dispose() {
       for (const { mesh } of meshes.values()) {
@@ -137,6 +169,7 @@ export function createProjectScene(renderer: WebGLRenderer) {
         mesh.material.dispose();
       }
       meshes.clear();
+      key.shadow.dispose();
       environment.dispose();
     },
   };

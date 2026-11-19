@@ -31,7 +31,8 @@ const schema = z.object({
   schemaVersion: z.literal(1), name: humanName, layers: z.array(layer).max(1000), groups: z.array(node).max(250).optional(),
   notices: z.array(z.string().max(1024)).max(30), light: z.enum(['studio', 'soft', 'dramatic', 'neon']),
   lighting: z.object({ azimuth: num.min(-180).max(180), elevation: num.min(-90).max(90),
-    strength: num.min(0).max(3), fill: num.min(0).max(2) }).optional(),
+    strength: num.min(0).max(3), fill: num.min(0).max(2), reflections: num.min(0).max(3).optional(),
+    studioAngle: num.min(-180).max(180).optional(), exposure: num.min(0.25).max(2).optional(), shadows: z.boolean().optional() }).optional(),
   camera: z.object({
     preset: z.enum(Object.keys(cameraPositions) as [keyof typeof cameraPositions, ...Array<keyof typeof cameraPositions>]),
     projection: z.enum(['perspective', 'orthographic']), position: vec3, target: vec3, zoom: num.min(0.2).max(6),

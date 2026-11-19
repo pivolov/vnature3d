@@ -18,22 +18,31 @@ const unit = Math.PI / 180;
 
 type Samples = [number, number][];
 type Recipe = {
-  position?: Samples; radial?: Samples; rotation?: Samples; scale?: Samples; opacity?: Samples;
+  position?: Samples; radial?: Samples; rotation?: Samples; scale?: Samples; turn?: Vec3[];
   squash?: Samples; shine?: Samples; glow?: Samples; jitter?: Samples;
   camera?: 'orbit';
 };
 const pulse = (...values: number[]): Samples => values.map((value, i) => [i / (values.length - 1), value]);
 
 export const presets = {
-  fade: { label: 'Появление', group: 'Вход', recipe: { opacity: pulse(0, 1), scale: pulse(0.65, 1) } },
+  inspect: { label: 'Показать фаску', group: '3D на месте', recipe: { turn: [[0, 0, 0], [-12, 42, 4], [-12, 42, 4], [0, 0, 0]] } },
+  bevelRock: { label: 'С ребра на ребро', group: '3D на месте', recipe: { turn: [[0, 0, 0], [6, 55, 0], [-6, -55, 0], [0, 0, 0]] } },
+  nod: { label: 'Кивок', group: '3D на месте', recipe: { turn: [[0, 0, 0], [28, 5, 0], [-12, -3, 0], [0, 0, 0]] } },
+  coin: { label: 'Переворот монеты', group: '3D на месте', recipe: { turn: [[0, 0, 0], [172, 12, 0], [172, 12, 0], [0, 0, 0]] } },
+  diagonal: { label: 'Диагональный наклон', group: '3D на месте', recipe: { turn: [[0, 0, 0], [20, 26, -14], [-14, -22, 10], [0, 0, 0]] } },
+  precess: { label: 'Круговой наклон', group: '3D на месте', recipe: { turn: Array.from({ length: 17 }, (_, i): Vec3 => {
+    const phase = i * Math.PI / 8;
+    return [14 * Math.sin(phase), 20 * (1 - Math.cos(phase)), 0];
+  }) } },
+  fade: { label: 'Вход масштабом', group: 'Вход', recipe: { scale: pulse(0.65, 1) } },
   pop: { label: 'Pop', group: 'Вход', recipe: { scale: [[0, 0.25], [0.56, 1.16], [0.8, 0.95], [1, 1]] } },
   drop: { label: 'Падение и отскок', group: 'Вход', recipe: { position: [[0, 1.8], [0.5, 0], [0.67, 0.38], [0.8, 0], [0.9, 0.12], [1, 0]] } },
-  slide: { label: 'Скольжение 3D', group: 'Вход', recipe: { position: pulse(-2, 0), opacity: pulse(0, 1), rotation: pulse(-28, 0) } },
-  flip: { label: 'Поворот с появлением', group: 'Вход', recipe: { rotation: pulse(-110, 0), opacity: [[0, 0], [0.38, 1], [1, 1]] } },
+  slide: { label: 'Скольжение 3D', group: 'Вход', recipe: { position: pulse(-2, 0), rotation: pulse(-28, 0) } },
+  flip: { label: 'Вход с ребра', group: 'Вход', recipe: { rotation: pulse(-110, 0) } },
   unfold: { label: 'Разворот', group: 'Вход', recipe: { rotation: pulse(92, -12, 0), squash: pulse(0.1, 1.08, 1) } },
-  assemble: { label: 'Сборка', group: 'Вход', recipe: { radial: pulse(2.1, 0), scale: pulse(0.55, 1), opacity: pulse(0, 1) } },
-  explode: { label: 'Разлёт', group: 'Выход', recipe: { radial: pulse(0, 2.3), rotation: pulse(0, 70), opacity: pulse(1, 0) } },
-  zoom: { label: 'Приближение насквозь', group: 'Выход', recipe: { scale: [[0, 1], [0.65, 1.3], [1, 3]], opacity: [[0, 1], [0.65, 1], [1, 0]] } },
+  assemble: { label: 'Сборка', group: 'Вход', recipe: { radial: pulse(2.1, 0), scale: pulse(0.55, 1) } },
+  explode: { label: 'Разлёт', group: 'Выход', recipe: { radial: pulse(0, 2.3), rotation: pulse(0, 70) } },
+  zoom: { label: 'Приближение насквозь', group: 'Выход', recipe: { scale: [[0, 1], [0.65, 1.3], [1, 3]] } },
   float: { label: 'Парение', group: 'Цикл', recipe: { position: pulse(0, 0.35, 0, -0.35, 0) } },
   spin: { label: 'Оборот 360°', group: 'Цикл', recipe: { rotation: pulse(0, 360) } },
   wobble: { label: 'Покачивание', group: 'Цикл', recipe: { rotation: pulse(0, 18, 0, -18, 0) } },
@@ -48,18 +57,26 @@ export const presets = {
   heartbeat: { label: 'Сердцебиение', group: 'Акцент', recipe: { scale: [[0, 1], [0.18, 1.23], [0.33, 1], [0.47, 1.14], [0.67, 1], [1, 1]] } },
   spring: { label: 'Пружина', group: 'Акцент', recipe: {} },
   rubber: { label: 'Резинка', group: 'Акцент', recipe: { squash: pulse(1, 1.36, 0.73, 1.16, 0.91, 1) } },
-  segments: { label: 'Вращение сегментов', group: 'Лоадер', recipe: { rotation: pulse(0, 360), opacity: pulse(1, 0.45, 1) } },
+  segments: { label: 'Вращение сегментов', group: 'Лоадер', recipe: { rotation: pulse(0, 360) } },
   morph: { label: 'Пульсация формы', group: 'Лоадер', recipe: { squash: pulse(1, 0.75, 1, 1.27, 1) } },
-  progress: { label: 'Заполнение', group: 'Лоадер', recipe: { squash: [[0, 0.03], [0.88, 1], [1, 1]], opacity: [[0, 0.25], [0.3, 1], [1, 1]] } },
+  progress: { label: 'Заполнение', group: 'Лоадер', recipe: { squash: [[0, 0.03], [0.88, 1], [1, 1]] } },
 } satisfies Record<string, { label: string; group: string; recipe: Recipe }>;
 export type PresetId = keyof typeof presets;
 
 export function presetGraph(id: PresetId) {
   const recipe: Recipe = presets[id].recipe;
-  const samples = recipe.position ?? recipe.radial ?? recipe.rotation ?? recipe.scale ?? recipe.opacity ??
+  const samples = recipe.position ?? recipe.radial ?? recipe.rotation ?? recipe.scale ??
     recipe.squash ?? recipe.jitter ?? recipe.shine ?? recipe.glow ?? pulse(0, 1);
+  const turns = recipe.turn;
+  const turnAxis = turns ? [0, 1, 2].map(axis => Math.max(...turns.map(v => Math.abs(v[axis])))) : [];
+  const dominant = turnAxis.indexOf(Math.max(...turnAxis));
   const values = Array.from({ length: 33 }, (_, i) => {
     const t = i / 32;
+    if (turns) {
+      const scaled = t * (turns.length - 1);
+      const index = Math.min(turns.length - 2, Math.floor(scaled));
+      return turns[index][dominant] + (turns[index + 1][dominant] - turns[index][dominant]) * (scaled - index);
+    }
     if (id === 'spring') return spring(t, 16, 0.43);
     if (id === 'orbit') return Math.sin(t * Math.PI * 2);
     const rightIndex = Math.max(1, samples.findIndex(([time]) => time >= t));
@@ -110,9 +127,9 @@ export function applyPreset(project: Project, id: PresetId, ids: string[], start
   const ranks = staggerRanks(layers.map((layer) => layer.id), options.order);
   const axis = axisIndex[options.direction.at(-1) as keyof typeof axisIndex];
   const sign = options.direction.startsWith('-') ? -1 : 1;
-  const end = Math.min(120, start + options.delay + options.duration + (recipe.camera ? 0 : Math.max(0, layers.length - 1) * options.stagger));
-  if (start + options.delay >= 120) return project;
-  timeline = { ...timeline, duration: Math.max(timeline.duration, end) };
+  const end = start + options.delay + options.duration + (recipe.camera ? 0 : Math.max(0, layers.length - 1) * options.stagger);
+  if (end > 120 + 1e-8) return project;
+  timeline = { ...timeline, duration: Math.min(120, Math.max(timeline.duration, end)) };
   const generated: Track[] = [];
   function channel(target: string, property: Property, offset: number, samples: Samples, combine: (amount: number) => Value, easing = options.easing) {
     const distinct = new Map<number, Key>();
@@ -146,7 +163,13 @@ export function applyPreset(project: Project, id: PresetId, ids: string[], start
     }
     if (recipe.rotation) set('rotation', recipe.rotation, (amount) => toVector(layer.rotation, axis, amount * sign * unit * strength),
       id === 'spin' || id === 'segments' ? linear : options.easing);
-    if (recipe.opacity) set('opacity', recipe.opacity, (amount) => Math.max(0, Math.min(1, layer.opacity * (1 + (amount - 1) * strength))));
+    if (recipe.turn) {
+      const turns = recipe.turn;
+      const samples: Samples = turns.map((_, i) => [i / (turns.length - 1), i]);
+      set('rotation', samples, (i) => layer.rotation.map((angle, component) =>
+        angle + turns[i][(component + 4 - axis) % 3] * unit * strength * sign) as Vec3,
+      id === 'precess' ? linear : options.easing);
+    }
     if (recipe.scale || recipe.squash) set('scale', (recipe.scale ?? recipe.squash)!, (amount) => {
       const multiplier = Math.max(0.01, 1 + (amount - 1) * strength);
       const balanced = id === 'progress' || id === 'unfold' ? 1 : 1 / Math.sqrt(multiplier);
@@ -183,6 +206,7 @@ export function applyPreset(project: Project, id: PresetId, ids: string[], start
 export function applyTemplate(project: Project, id: TemplateId, ids: string[], options: PresetOptions): Project {
   const template = templates[id];
   const timeline = { ...defaultTimeline, ...project.timeline, duration: Math.max(project.timeline?.duration ?? 0, options.duration * template.sequence.length + options.delay), loop: id === 'loader' ? 'loop' as const : 'once' as const };
+  if (options.duration * template.sequence.length + options.delay + Math.max(0, ids.length - 1) * options.stagger > 120) return project;
   const prepared = { ...project, timeline, light: template.light,
     layers: project.layers.map((layer) => ids.includes(layer.id) && !effectiveLayer(project, layer).locked
       ? { ...layer, material: template.material, roughness: undefined } : layer) };

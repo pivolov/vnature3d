@@ -36,7 +36,7 @@ export function world(layer: Layer) {
 export function normalToWorld(matrix: Matrix4) { return new Matrix3().getNormalMatrix(matrix); }
 
 const illumination = {
-  studio: [0.41, 0.63, 0.21, 0.25],
+  studio: [0.32, 0.68, 0.17, 0.25],
   soft: [0.57, 0.41, 0.29, 0.16],
   dramatic: [0.22, 0.86, 0.10, 0.36],
   neon: [0.30, 0.46, 0.25, 0.5],
@@ -50,13 +50,13 @@ export function flatFill(layer: Layer, normal: Vector3, project: Project, view =
   const base = new Color(layer.color);
   const how = materials[layer.material];
   const roughness = layer.roughness ?? how.roughness;
-  const rotation = layer.shine ?? 0;
+  const rotation = (layer.shine ?? 0) + (settings.studioAngle ?? 0) * Math.PI / 180;
   const reflection = new Vector3(Math.sin(rotation + 0.32), 0.45, Math.cos(rotation + 0.32)).normalize();
   const half = reflection.add(view).normalize();
   const spec = Math.pow(Math.max(0, normal.dot(half)), 6 + 45 * (1 - roughness)) * (0.04 + how.metalness * 0.17 + how.clearcoat * 0.1);
   const diffuse = ambient * settings.fill + a * settings.strength * Math.max(0, normal.dot(key)) +
     b * settings.fill * Math.max(0, normal.dot(lights[1])) + c * Math.max(0, normal.dot(lights[2]));
-  const color = base.multiplyScalar(diffuse * 0.9).addScalar(spec).add(new Color(layer.emissive ?? '#000000')).convertLinearToSRGB();
+  const color = base.multiplyScalar(diffuse * 0.9).addScalar(spec * (settings.reflections ?? 1)).add(new Color(layer.emissive ?? '#000000')).multiplyScalar(settings.exposure ?? 1).convertLinearToSRGB();
   const channel = (value: number) => round(Math.round(Math.min(1, Math.max(0, value)) * 40) / 40, 3);
   return [channel(color.r), channel(color.g), channel(color.b)];
 }

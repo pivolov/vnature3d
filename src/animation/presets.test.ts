@@ -77,3 +77,28 @@ it('keeps late keys reachable after applying a short scene template', () => {
     project.timeline?.tracks.find(track => track.property === 'emissive'),
   );
 });
+
+it('keeps the original opacity in every preset, including loader and exit animations', () => {
+  const subject = { ...layer, opacity: 0.67 };
+  for (const id of Object.keys(presets) as PresetId[]) {
+    const project = applyPreset({ ...emptyProject, layers: [subject] }, id, [subject.id], 0, presetDefaults);
+    expect(project.timeline?.tracks.some(track => track.property === 'opacity'), id).toBe(false);
+    expect(evaluate(project, 0.8).layers[0].opacity, id).toBe(0.67);
+  }
+});
+
+it('keeps showcase motions centered and returns to the starting pose at fractional intensity', () => {
+  for (const id of Object.keys(presets) as PresetId[]) {
+    if (presets[id].group !== '3D на месте') continue;
+    const project = applyPreset({ ...emptyProject, layers: [layer] }, id, [layer.id], 0, { ...presetDefaults, intensity: 0.65 });
+    const tracks = project.timeline!.tracks;
+    expect(tracks.map(t => t.property)).toEqual(['rotation']);
+    expect(tracks[0].keys[1].value).not.toEqual(layer.rotation);
+    expect(isSeamless(project), id).toBe(true);
+  }
+});
+
+it('rejects motion that would collapse remaining rotation keys onto the final frame', () => {
+  const project = { ...emptyProject, layers: [layer] };
+  expect(applyPreset(project, 'coin', [layer.id], 119, presetDefaults)).toBe(project);
+});

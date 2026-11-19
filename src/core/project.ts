@@ -9,6 +9,8 @@ export type Shape = {
 };
 
 export const materials = {
+  chrome: { label: 'Полированный хром', roughness: 0.085, metalness: 1, clearcoat: 0.18 },
+  ceramic: { label: 'Глазурованная керамика', roughness: 0.38, metalness: 0, clearcoat: 1 },
   clay: { label: 'Матовая глина', roughness: 0.68, metalness: 0.02, clearcoat: 0.12 },
   plastic: { label: 'Глянцевый пластик', roughness: 0.24, metalness: 0.02, clearcoat: 0.8 },
   metal: { label: 'Шлифованный металл', roughness: 0.36, metalness: 0.85, clearcoat: 0.2 },
@@ -44,10 +46,10 @@ export type LightPreset = 'studio' | 'soft' | 'dramatic' | 'neon';
 export const defaultLighting = {
   azimuth: Math.atan2(3, 5) * 180 / Math.PI,
   elevation: Math.atan2(5, Math.hypot(3, 5)) * 180 / Math.PI,
-  strength: 1, fill: 1,
+  strength: 1, fill: 1, reflections: 1, studioAngle: 0, exposure: 1, shadows: false,
 };
 
-export function keyDirection(settings: typeof defaultLighting): Vec3 {
+export function keyDirection(settings: Pick<typeof defaultLighting, 'azimuth' | 'elevation'>): Vec3 {
   const yaw = settings.azimuth * Math.PI / 180;
   const pitch = settings.elevation * Math.PI / 180;
   return [Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch)];
@@ -70,7 +72,8 @@ export type Project = {
   notices: string[];
   timeline?: TimelineData;
   light: LightPreset;
-  lighting?: typeof defaultLighting;
+  lighting?: Pick<typeof defaultLighting, 'azimuth' | 'elevation' | 'strength' | 'fill'> &
+    Partial<Pick<typeof defaultLighting, 'reflections' | 'studioAngle' | 'exposure' | 'shadows'>>;
   camera: { preset: CameraPreset; projection: 'perspective' | 'orthographic'; position: Vec3; target: Vec3; zoom: number };
 };
 

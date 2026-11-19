@@ -80,7 +80,7 @@ function LayerInspector({ layer, set }: { layer: Layer; set: (patch: Partial<Lay
       <label className="field"><span>Пресет</span><select value={layer.material}
         onChange={(event) => {
           const material = event.target.value as Layer['material'];
-          set({ material, roughness: undefined, ...(material === 'gold' ? { color: '#eec269' } : {}) });
+          set({ material, roughness: undefined, ...(material === 'gold' ? { color: '#eec269' } : material === 'chrome' ? { color: '#dfe2e5' } : {}) });
         }}>
         {Object.entries(materials).map(([value, material]) => <option key={value} value={value}>{material.label}</option>)}
       </select></label>
@@ -155,7 +155,7 @@ export function App() {
   const [grid, setGrid] = useState(true);
   const [gizmo, setGizmo] = useState<'translate' | 'rotate' | false>(false);
   const [lightDraft, setLightDraft] = useState<typeof defaultLighting | null>(null);
-  const settings = lightDraft ?? project.lighting ?? defaultLighting;
+  const settings = lightDraft ?? { ...defaultLighting, ...project.lighting };
   function commitLight(value: typeof defaultLighting) {
     setLightDraft(null);
     change(current => ({ ...current, lighting: value }));
@@ -491,7 +491,7 @@ export function App() {
             const start = selection.type === 'template' ? 0 : time;
             setPlay(0); setPreview(null);
             const result = applyMotion(project, selection, options, all, start);
-            if (result === project) { setError('Выберите видимый слой или уменьшите задержку.'); return; }
+            if (result === project) { setError('Движение должно поместиться в 120 секунд. Сдвиньте начало или уменьшите длительность, задержку либо каскад.'); return; }
             setError(''); change(() => result);
             setCameraTrack(selection.id === 'orbit');
             setTimelineVisible(true);
@@ -583,6 +583,10 @@ export function App() {
         {inspect === 'layer' && !selected && <p className="muted-empty">Выберите объект во вьюпорте или на панели слоёв.</p>}
         {inspect === 'layer' && selected && <div className="inspector-object"><span className="swatch" style={{ background: selected.color }} />{selected.name}</div>}
         {inspect === 'layer' && selected && (selected.locked ? <p className="muted-empty">Слой заблокирован.</p> : <LayerInspector key={selected.id} layer={selected} set={(patch) => editLayer(selected.id, patch)} />)}
+        {inspect === 'layer' && selected && !selected.locked && sceneTimeline.tracks.some(track => track.target === selected.id && track.property === 'opacity') &&
+          <button className="secondary" onClick={() => updateTimeline(timeline => ({ ...timeline,
+            tracks: timeline.tracks.filter(track => track.target !== selected.id || track.property !== 'opacity'),
+          }))}>Убрать анимацию прозрачности</button>}
         {inspect === 'scene' && <Section title="Свет и камера" expanded>
           <label className="field"><span>Свет</span><select value={project.light} onChange={(event) => {
             const light = event.target.value as LightPreset;
@@ -595,6 +599,9 @@ export function App() {
             ['elevation', 'Высота света', -90, 90, '°'],
             ['strength', 'Сила света', 0, 300, '%'],
             ['fill', 'Заполняющий свет', 0, 200, '%'],
+            ['studioAngle', 'Поворот отражений', -180, 180, '°'],
+            ['reflections', 'Сила отражений', 0, 300, '%'],
+            ['exposure', 'Экспозиция', 25, 200, '%'],
           ] as const).map(([key, label, min, max, unit]) => {
             const scale = unit === '%' ? 100 : 1;
             const value = Math.round(settings[key] * scale);
@@ -610,6 +617,8 @@ export function App() {
                 onKeyUp={() => { if (lightDraft) commitLight(lightDraft); }}
                 onBlur={() => { if (lightDraft) commitLight(lightDraft); }} /></label>;
           })}
+          <label className="toggle-field"><input type="checkbox" checked={settings.shadows}
+            onChange={event => commitLight({ ...settings, shadows: event.currentTarget.checked })} /> Тени от модели</label>
           <button className="secondary" disabled={!project.lighting} onClick={() => change(current => ({ ...current, lighting: undefined }))}>Сбросить настройки света</button>
           <label className="field"><span>Проекция</span><select value={project.camera.projection} onChange={(event) => {
             const projection = event.target.value as typeof project.camera.projection;
