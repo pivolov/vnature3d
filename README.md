@@ -1,7 +1,7 @@
-# VS3D v7 — запуск через Live Server
+# VS3D v8 — запуск через Live Server
 
-1. Скачай **VS3D v7.zip** и распакуй архив.
-2. В VS Code выбери **File → Open Folder** и открой папку `VS3D v7`.
+1. Скачай **VS3D v8.zip** и распакуй архив.
+2. В VS Code выбери **File → Open Folder** и открой папку `VS3D v8`.
 3. При необходимости установи **Live Server** от **Ritwick Dey** в разделе **Extensions**.
 4. Нажми правой кнопкой на `index.html` → **Open with Live Server**.
 
