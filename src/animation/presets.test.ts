@@ -68,3 +68,12 @@ it('uses the layer hue for glow and animates reflected light without turning the
   expect(evaluate(shining, 0.8).layers[0].shine).toBeCloseTo(Math.PI);
   expect(isSeamless(shining)).toBe(true);
 });
+
+it('keeps late keys reachable after applying a short scene template', () => {
+  const project = applyPreset({ ...emptyProject, layers: [layer] }, 'glow', [layer.id], 8, presetDefaults);
+  const result = applyTemplate(project, 'loader', [layer.id], presetDefaults);
+  expect(result.timeline?.duration).toBe(project.timeline?.duration);
+  expect(result.timeline?.tracks.find(track => track.property === 'emissive')).toEqual(
+    project.timeline?.tracks.find(track => track.property === 'emissive'),
+  );
+});

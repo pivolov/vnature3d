@@ -1,11 +1,11 @@
-import { Play, Sparkles } from 'lucide-react';
+import { Play, Search, Sparkles, X } from 'lucide-react';
 import { useState } from 'react';
 import { type Easing } from '../animation/easing';
 import { presetDefaults, presetGraph, presets, templates, type PresetId, type PresetOptions, type TemplateId } from '../animation/presets';
 
 export type PresetSelection = { type: 'preset'; id: PresetId } | { type: 'template'; id: TemplateId };
 type Props = {
-  canAnimate: boolean; canAnimateSelected: boolean;
+  emptyScene: boolean; canAnimate: boolean; canAnimateSelected: boolean;
   preview: (value: { selection: PresetSelection; options: PresetOptions; all: boolean } | null) => void;
   apply: (selection: PresetSelection, options: PresetOptions, all: boolean) => void;
 };
@@ -22,21 +22,26 @@ const easingOptions = {
   linear: { kind: 'linear' },
 } satisfies Record<string, Easing>;
 
-export function PresetLibrary({ canAnimate, canAnimateSelected, preview, apply }: Props) {
+export function PresetLibrary({ emptyScene, canAnimate, canAnimateSelected, preview, apply }: Props) {
   const [selection, setSelection] = useState<PresetSelection>({ type: 'preset', id: 'fade' });
+  const [query, setQuery] = useState('');
   const [category, setCategory] = useState(categories[0]);
   const [library, setLibrary] = useState<PresetSelection['type']>('preset');
   const [options, setOptions] = useState(presetDefaults);
   const [scope, setScope] = useState<'selected' | 'all'>('selected');
   const [easing, setEasing] = useState<keyof typeof easingOptions>('smooth');
-  const all = scope === 'all' || !canAnimateSelected;
-  const eligible = (entry: PresetSelection) => entry.type === 'template' || entry.id === 'orbit' || canAnimate;
+  const all = scope === 'all';
+  const canTarget = all ? canAnimate : canAnimateSelected;
+  const eligible = (entry: PresetSelection) => canTarget || (entry.type === 'template' ? emptyScene : entry.id === 'orbit');
+  const term = query.trim().toLocaleLowerCase('ru');
   const items = library === 'preset'
-    ? (Object.entries(presets) as [PresetId, typeof presets[PresetId]][]).filter(([, item]) => item.group === category)
+    ? (Object.entries(presets) as [PresetId, typeof presets[PresetId]][])
+      .filter(([id, item]) => term ? [id, item.label, item.group].some((text) => text.toLocaleLowerCase('ru').includes(term)) : item.group === category)
       .map(([id, item]) => ({ name: item.label, entry: { type: 'preset', id } as const }))
     : (Object.entries(templates) as [TemplateId, typeof templates[TemplateId]][])
+      .filter(([id, item]) => [id, item.label].some((text) => text.toLocaleLowerCase('ru').includes(term)))
       .map(([id, item]) => ({ name: item.label, entry: { type: 'template', id } as const }));
-  const active = items.find(({ entry }) => entry.id === selection.id)?.entry ?? items[0].entry;
+  const active = items.find(({ entry }) => entry.id === selection.id)?.entry ?? items[0]?.entry;
 
   function show(entry: PresetSelection) {
     if (eligible(entry)) preview({ selection: entry, options, all });
@@ -44,16 +49,23 @@ export function PresetLibrary({ canAnimate, canAnimateSelected, preview, apply }
 
   return <div className="preset-library">
     <div className="preset-tabs">
-      <button type="button" aria-pressed={library === 'preset'} onClick={() => { setLibrary('preset'); preview(null); }}>Движение</button>
-      <button type="button" aria-pressed={library === 'template'} onClick={() => { setLibrary('template'); preview(null); }}>Шаблоны</button>
+      <button type="button" aria-pressed={library === 'preset'} onClick={() => { setLibrary('preset'); setQuery(''); preview(null); }}>Движение</button>
+      <button type="button" aria-pressed={library === 'template'} onClick={() => { setLibrary('template'); setQuery(''); preview(null); }}>Шаблоны</button>
     </div>
-    {library === 'preset' && <label className="preset-field"><span>Категория</span>
+    <div className="preset-search"><Search size={14} aria-hidden="true" />
+      <input aria-label="Поиск в библиотеке" placeholder={library === 'preset' ? 'Найти движение…' : 'Найти шаблон…'} value={query}
+        onChange={(event) => { setQuery(event.currentTarget.value); preview(null); }} />
+      {query && <button type="button" aria-label="Очистить поиск" onClick={(event) => {
+        event.currentTarget.parentElement?.querySelector('input')?.focus(); setQuery(''); preview(null);
+      }}><X size={14} /></button>}
+    </div>
+    {library === 'preset' && !term && <label className="preset-field"><span>Категория</span>
       <select value={category} onChange={(event) => { setCategory(event.currentTarget.value); preview(null); }}>
         {categories.map((item) => <option key={item}>{item}</option>)}
       </select></label>}
     <div className="preset-list">
       {items.map(({ name, entry }) => <button type="button" key={entry.id}
-        aria-pressed={active.id === entry.id} disabled={!eligible(entry)} title="Наведите для предпросмотра"
+        aria-pressed={active?.id === entry.id} disabled={!eligible(entry)} title="Наведите для предпросмотра"
         onPointerEnter={(event) => { if (event.pointerType === 'mouse') show(entry); }} onPointerLeave={() => preview(null)}
         onClick={() => setSelection(entry)}>
         <svg viewBox="0 0 44 36" aria-hidden="true" className="preset-graph">
@@ -63,11 +75,14 @@ export function PresetLibrary({ canAnimate, canAnimateSelected, preview, apply }
         <span>{name}</span>
       </button>)}
     </div>
+    {!active && <p role="status" className="preset-note">Совпадений нет. Попробуйте другое название.</p>}
+    {active && <>
+    {active.id !== 'orbit' && !(emptyScene && active.type === 'template') && <label className="preset-field"><span>Применить к</span>
+      <select value={scope} onChange={(event) => { setScope(event.currentTarget.value as typeof scope); preview(null); }}>
+        <option value="selected">Выбранному</option><option value="all">Всей сцене</option>
+      </select></label>}
+    {!eligible(active) && <p className="preset-note">{canAnimate ? 'Выберите доступный слой или укажите «Всей сцене».' : 'Для движения нужен видимый разблокированный слой.'}</p>}
     <details className="preset-options"><summary>Параметры пресета</summary><div className="preset-fields">
-      <label className="preset-field"><span>Применить к</span>
-        <select value={all ? 'all' : 'selected'} onChange={(event) => setScope(event.currentTarget.value as typeof scope)}>
-          <option value="selected" disabled={!canAnimateSelected}>Выбранному</option><option value="all">Всей сцене</option>
-        </select></label>
       {presetOptions.map(([key, label, min, max, step]) => <label className="preset-field" key={key}><span>{label}</span>
         <input type="number" min={min} max={max} step={step} defaultValue={options[key]}
           onBlur={(event) => {
@@ -102,6 +117,6 @@ export function PresetLibrary({ canAnimate, canAnimateSelected, preview, apply }
       <button type="button" className="primary" disabled={!eligible(active)} onClick={() => {
         preview(null); apply(active, options, all);
       }}><Sparkles size={14} />Применить</button>
-    </div>
+    </div></>}
   </div>;
 }

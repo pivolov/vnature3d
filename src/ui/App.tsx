@@ -477,7 +477,7 @@ export function App() {
         <div className={side === 'layers' ? 'side-content layer-content' : 'settings-scroll side-content'}>
         {side === 'layers' && <LayerTree project={project} selectedId={selectedId} change={change}
           select={selectLayer} />}
-        {side === 'presets' && <PresetLibrary canAnimate={!!activeLayers.length} canAnimateSelected={canAnimateSelected} preview={showMotion}
+        {side === 'presets' && <PresetLibrary emptyScene={!project.layers.length} canAnimate={!!activeLayers.length} canAnimateSelected={canAnimateSelected} preview={showMotion}
           apply={(selection, options, all) => {
             const start = selection.type === 'template' ? 0 : time;
             setPlay(0); setPreview(null);

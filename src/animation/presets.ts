@@ -182,7 +182,7 @@ export function applyPreset(project: Project, id: PresetId, ids: string[], start
 
 export function applyTemplate(project: Project, id: TemplateId, ids: string[], options: PresetOptions): Project {
   const template = templates[id];
-  const timeline = { ...defaultTimeline, ...project.timeline, duration: options.duration * template.sequence.length + options.delay, loop: id === 'loader' ? 'loop' as const : 'once' as const };
+  const timeline = { ...defaultTimeline, ...project.timeline, duration: Math.max(project.timeline?.duration ?? 0, options.duration * template.sequence.length + options.delay), loop: id === 'loader' ? 'loop' as const : 'once' as const };
   const prepared = { ...project, timeline, light: template.light,
     layers: project.layers.map((layer) => ids.includes(layer.id) && !effectiveLayer(project, layer).locked
       ? { ...layer, material: template.material, roughness: undefined } : layer) };

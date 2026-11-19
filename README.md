@@ -4,7 +4,7 @@
 
 ## Запуск без команд
 
-[Скачать сборку для VS Code и Live Server](https://raw.githubusercontent.com/pivolov/vnature3d/downloads/VS3D%20v4.zip). Распакуйте ZIP, откройте папку в VS Code и выберите **Open with Live Server** в меню файла `index.html`. Для 3D нужен браузер с WebGL 2.
+[Скачать сборку для VS Code и Live Server](https://raw.githubusercontent.com/pivolov/vnature3d/downloads/VS3D%20v5.zip). Распакуйте ZIP, откройте папку в VS Code и выберите **Open with Live Server** в меню файла `index.html`. Для 3D нужен браузер с WebGL 2.
 
 ## Запуск из исходников
 

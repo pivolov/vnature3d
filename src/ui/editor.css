@@ -482,3 +482,9 @@ button:focus-visible { outline-color: #b8edcf; }
   .frame-guide-select { max-width: 84px; font-size: 10px; }
   .canvas-footer .view-switch button { padding-inline: 5px; font-size: 10px; }
 }
+
+.preset-search { display: flex; gap: 6px; align-items: center; padding-inline: 8px 3px; background: var(--field); border: 1px solid var(--line); border-radius: 6px; color: var(--muted); }
+.preset-search:focus-within { border-color: var(--accent); }
+.preset-search input { flex: 1; min-width: 0; border: 0; background: transparent; color: inherit; height: 32px; }
+.preset-search button { display: grid; place-items: center; width: 27px; height: 27px; background: transparent; border: 0; color: inherit; }
+.preset-search button:hover { color: white; background: #393939; }
