@@ -1,7 +1,7 @@
-# VS3D v4 — запуск через Live Server
+# VS3D v5 — запуск через Live Server
 
-1. Скачай **VS3D v4.zip** и распакуй архив.
-2. В VS Code выбери **File → Open Folder** и открой папку `VS3D v4`.
+1. Скачай **VS3D v5.zip** и распакуй архив.
+2. В VS Code выбери **File → Open Folder** и открой папку `VS3D v5`.
 3. При необходимости установи **Live Server** от **Ritwick Dey** в разделе **Extensions**.
 4. Нажми правой кнопкой на `index.html` → **Open with Live Server**.
 
