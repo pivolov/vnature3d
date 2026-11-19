@@ -10,7 +10,7 @@ export type PresetOptions = {
   stagger: number; order: 'forward' | 'center' | 'random'; easing: Easing;
 };
 export const presetDefaults: PresetOptions = {
-  duration: 1.6, delay: 0, intensity: 1, direction: 'y', stagger: 0, order: 'forward',
+  duration: 4, delay: 0, intensity: 1, direction: 'y', stagger: 0, order: 'forward',
   easing: { kind: 'named', family: 'sine', direction: 'in-out' },
 };
 const axisIndex = { x: 0, y: 1, z: 2 } as const;
@@ -25,17 +25,17 @@ type Recipe = {
 const pulse = (...values: number[]): Samples => values.map((value, i) => [i / (values.length - 1), value]);
 
 export const presets = {
-  inspect: { label: 'Показать фаску', group: '3D на месте', recipe: { turn: [[0, 0, 0], [-12, 42, 4], [-12, 42, 4], [0, 0, 0]] } },
-  bevelRock: { label: 'С ребра на ребро', group: '3D на месте', recipe: { turn: [[0, 0, 0], [6, 55, 0], [-6, -55, 0], [0, 0, 0]] } },
-  nod: { label: 'Кивок', group: '3D на месте', recipe: { turn: [[0, 0, 0], [28, 5, 0], [-12, -3, 0], [0, 0, 0]] } },
-  coin: { label: 'Переворот монеты', group: '3D на месте', recipe: { turn: [[0, 0, 0], [172, 12, 0], [172, 12, 0], [0, 0, 0]] } },
-  diagonal: { label: 'Диагональный наклон', group: '3D на месте', recipe: { turn: [[0, 0, 0], [20, 26, -14], [-14, -22, 10], [0, 0, 0]] } },
+  inspect: { label: 'Показать фаску', group: '3D на месте', recipe: { turn: [[0, 0, 0], [-4, 16, 2], [0, 0, 0]] } },
+  bevelRock: { label: 'С ребра на ребро', group: '3D на месте', recipe: { turn: [[0, 0, 0], [2, 14, 0], [-2, -14, 0], [0, 0, 0]] } },
+  nod: { label: 'Кивок', group: '3D на месте', recipe: { turn: [[0, 0, 0], [9, 2, 0], [-4, -1, 0], [0, 0, 0]] } },
+  coin: { label: 'Переворот монеты', group: '3D на месте', recipe: { turn: [[0, 0, 0], [172, 5, 0], [0, 0, 0]] } },
+  diagonal: { label: 'Диагональный наклон', group: '3D на месте', recipe: { turn: [[0, 0, 0], [7, 10, -4], [-5, -8, 3], [0, 0, 0]] } },
   precess: { label: 'Круговой наклон', group: '3D на месте', recipe: { turn: Array.from({ length: 17 }, (_, i): Vec3 => {
     const phase = i * Math.PI / 8;
-    return [14 * Math.sin(phase), 20 * (1 - Math.cos(phase)), 0];
+    return [5 * Math.sin(phase), 7 * (1 - Math.cos(phase)), 0];
   }) } },
   fade: { label: 'Вход масштабом', group: 'Вход', recipe: { scale: pulse(0.65, 1) } },
-  pop: { label: 'Pop', group: 'Вход', recipe: { scale: [[0, 0.25], [0.56, 1.16], [0.8, 0.95], [1, 1]] } },
+  pop: { label: 'Pop', group: 'Вход', recipe: { scale: [[0, 0.65], [0.62, 1.045], [1, 1]] } },
   drop: { label: 'Падение и отскок', group: 'Вход', recipe: { position: [[0, 1.8], [0.5, 0], [0.67, 0.38], [0.8, 0], [0.9, 0.12], [1, 0]] } },
   slide: { label: 'Скольжение 3D', group: 'Вход', recipe: { position: pulse(-2, 0), rotation: pulse(-28, 0) } },
   flip: { label: 'Вход с ребра', group: 'Вход', recipe: { rotation: pulse(-110, 0) } },
@@ -43,20 +43,20 @@ export const presets = {
   assemble: { label: 'Сборка', group: 'Вход', recipe: { radial: pulse(2.1, 0), scale: pulse(0.55, 1) } },
   explode: { label: 'Разлёт', group: 'Выход', recipe: { radial: pulse(0, 2.3), rotation: pulse(0, 70) } },
   zoom: { label: 'Приближение насквозь', group: 'Выход', recipe: { scale: [[0, 1], [0.65, 1.3], [1, 3]] } },
-  float: { label: 'Парение', group: 'Цикл', recipe: { position: pulse(0, 0.35, 0, -0.35, 0) } },
+  float: { label: 'Парение', group: 'Цикл', recipe: { position: pulse(0, 0.14, 0, -0.14, 0) } },
   spin: { label: 'Оборот 360°', group: 'Цикл', recipe: { rotation: pulse(0, 360) } },
-  wobble: { label: 'Покачивание', group: 'Цикл', recipe: { rotation: pulse(0, 18, 0, -18, 0) } },
-  pendulum: { label: 'Маятник', group: 'Цикл', recipe: { rotation: pulse(-28, 28, -28), position: pulse(-0.25, 0.25, -0.25) } },
-  breathing: { label: 'Дыхание', group: 'Цикл', recipe: { scale: pulse(1, 1.13, 1) } },
+  wobble: { label: 'Покачивание', group: 'Цикл', recipe: { rotation: pulse(0, 8, 0, -8, 0) } },
+  pendulum: { label: 'Маятник', group: 'Цикл', recipe: { rotation: pulse(-12, 12, -12), position: pulse(-0.1, 0.1, -0.1) } },
+  breathing: { label: 'Дыхание', group: 'Цикл', recipe: { scale: pulse(1, 1.045, 1) } },
   orbit: { label: 'Орбита камеры', group: 'Цикл', recipe: { camera: 'orbit' } },
-  tilt: { label: 'Наклон', group: 'Цикл', recipe: { rotation: pulse(0, -16, 12, 0), position: pulse(0, 0.18, -0.12, 0) } },
+  tilt: { label: 'Наклон', group: 'Цикл', recipe: { rotation: pulse(0, -8, 6, 0), position: pulse(0, 0.07, -0.05, 0) } },
   shine: { label: 'Пробегающий блик', group: 'Цикл', recipe: { shine: pulse(0, 360) } },
-  glow: { label: 'Пульс свечения', group: 'Цикл', recipe: { glow: pulse(0, 0.55, 0) } },
-  shake: { label: 'Встряска', group: 'Акцент', recipe: { jitter: pulse(0, 0.32, -0.3, 0.23, -0.19, 0.12, 0) } },
-  jelly: { label: 'Желе', group: 'Акцент', recipe: { squash: pulse(1, 0.59, 1.26, 0.9, 1) } },
+  glow: { label: 'Пульс свечения', group: 'Цикл', recipe: { glow: pulse(0, 0.25, 0) } },
+  shake: { label: 'Встряска', group: 'Акцент', recipe: { jitter: pulse(0, 0.12, -0.08, 0.04, 0) } },
+  jelly: { label: 'Желе', group: 'Акцент', recipe: { squash: pulse(1, 0.85, 1.07, 1) } },
   heartbeat: { label: 'Сердцебиение', group: 'Акцент', recipe: { scale: [[0, 1], [0.18, 1.23], [0.33, 1], [0.47, 1.14], [0.67, 1], [1, 1]] } },
   spring: { label: 'Пружина', group: 'Акцент', recipe: {} },
-  rubber: { label: 'Резинка', group: 'Акцент', recipe: { squash: pulse(1, 1.36, 0.73, 1.16, 0.91, 1) } },
+  rubber: { label: 'Резинка', group: 'Акцент', recipe: { squash: pulse(1, 1.14, 0.94, 1) } },
   segments: { label: 'Вращение сегментов', group: 'Лоадер', recipe: { rotation: pulse(0, 360) } },
   morph: { label: 'Пульсация формы', group: 'Лоадер', recipe: { squash: pulse(1, 0.75, 1, 1.27, 1) } },
   progress: { label: 'Заполнение', group: 'Лоадер', recipe: { squash: [[0, 0.03], [0.88, 1], [1, 1]] } },
@@ -77,7 +77,7 @@ export function presetGraph(id: PresetId) {
       const index = Math.min(turns.length - 2, Math.floor(scaled));
       return turns[index][dominant] + (turns[index + 1][dominant] - turns[index][dominant]) * (scaled - index);
     }
-    if (id === 'spring') return spring(t, 16, 0.43);
+    if (id === 'spring') return spring(t, 12, 0.72);
     if (id === 'orbit') return Math.sin(t * Math.PI * 2);
     const rightIndex = Math.max(1, samples.findIndex(([time]) => time >= t));
     const [from, a] = samples[rightIndex - 1];
@@ -184,7 +184,7 @@ export function applyPreset(project: Project, id: PresetId, ids: string[], start
       const count = Math.min(181, Math.max(5, Math.ceil(options.duration * timeline.fps) + 1));
       const samples: Samples = Array.from({ length: count }, (_, i) => {
         const t = i / (count - 1);
-        return [t, i === count - 1 ? 1 : spring(t, 16, 0.43)];
+        return [t, i === count - 1 ? 1 : spring(t, 12, 0.72)];
       });
       const compact = reduceLinear(samples, ([time]) => time, ([, amount]) => [amount], 0.005 / Math.max(1, strength, ...scale));
       set('scale', compact, (amount) => scale.map((value) => Math.max(0.01, value * (1 + (amount - 1) * 0.48 * strength))) as Vec3, linear);

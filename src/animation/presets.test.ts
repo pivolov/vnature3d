@@ -53,19 +53,19 @@ it('starts a preset from the evaluated motion and keeps keys before its range', 
   const result = applyPreset(input, 'float', [layer.id], 1, presetDefaults);
   expect(evaluate(result, 0).layers[0].position).toEqual([0, 0, 0]);
   expect(evaluate(result, 1).layers[0].position).toEqual([1, 0, 0]);
-  expect(evaluate(result, 1.4).layers[0].position[1]).toBeCloseTo(0.35);
+  expect(evaluate(result, 1 + presetDefaults.duration / 4).layers[0].position[1]).toBeCloseTo(0.14);
 });
 
 it('uses the layer hue for glow and animates reflected light without turning the model', () => {
   const green = { ...layer, color: '#22cc44' };
   const project = { ...emptyProject, layers: [green] };
   const glowing = applyPreset(project, 'glow', [green.id], 0, presetDefaults);
-  const peak = evaluate(glowing, 0.8).layers[0].emissive!;
+  const peak = evaluate(glowing, presetDefaults.duration / 2).layers[0].emissive!;
   const rgb = peak.slice(1).match(/../g)!.map((channel) => parseInt(channel, 16));
   expect(rgb[1]).toBeGreaterThan(rgb[0] * 2);
   const shining = applyPreset(project, 'shine', [green.id], 0, presetDefaults);
   expect(shining.timeline?.tracks.map(({ property }) => property)).toEqual(['shine']);
-  expect(evaluate(shining, 0.8).layers[0].shine).toBeCloseTo(Math.PI);
+  expect(evaluate(shining, presetDefaults.duration / 2).layers[0].shine).toBeCloseTo(Math.PI);
   expect(isSeamless(shining)).toBe(true);
 });
 
