@@ -27,9 +27,10 @@ export function PresetLibrary({ emptyScene, canAnimate, canAnimateSelected, prev
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState(categories[0]);
   const [library, setLibrary] = useState<PresetSelection['type']>('preset');
-  const [options, setOptions] = useState(presetDefaults);
+  const [sharedOptions, setSharedOptions] = useState(presetDefaults);
+  const [hoverOptions, setHoverOptions] = useState({ ...presetDefaults, duration: 12 });
   const [scope, setScope] = useState<'selected' | 'all'>('selected');
-  const [easing, setEasing] = useState<keyof typeof easingOptions>('smooth');
+
   const all = scope === 'all';
   const canTarget = all ? canAnimate : canAnimateSelected;
   const eligible = (entry: PresetSelection) => canTarget || (entry.type === 'template' ? emptyScene : entry.id === 'orbit');
@@ -43,8 +44,13 @@ export function PresetLibrary({ emptyScene, canAnimate, canAnimateSelected, prev
       .map(([id, item]) => ({ name: item.label, entry: { type: 'template', id } as const }));
   const active = items.find(({ entry }) => entry.id === selection.id)?.entry ?? items[0]?.entry;
 
+  const hoverTurn = active?.id === 'hoverTurn';
+  const options = hoverTurn ? hoverOptions : sharedOptions;
+  const setOptions = hoverTurn ? setHoverOptions : setSharedOptions;
+  const easing = (Object.keys(easingOptions) as (keyof typeof easingOptions)[]).find(key =>
+    options.easing === easingOptions[key]) ?? 'smooth';
   function show(entry: PresetSelection) {
-    if (eligible(entry)) preview({ selection: entry, options, all });
+    if (eligible(entry)) preview({ selection: entry, options: entry.id === 'hoverTurn' ? hoverOptions : sharedOptions, all });
   }
 
   return <div className="preset-library">
@@ -83,7 +89,7 @@ export function PresetLibrary({ emptyScene, canAnimate, canAnimateSelected, prev
       </select></label>}
     {!eligible(active) && <p className="preset-note">{canAnimate ? 'Выберите доступный слой или укажите «Всей сцене».' : 'Для движения нужен видимый разблокированный слой.'}</p>}
     <details className="preset-options"><summary>Параметры пресета</summary><div className="preset-fields">
-      {presetOptions.map(([key, label, min, max, step]) => <label className="preset-field" key={key}><span>{label}</span>
+      {presetOptions.map(([key, label, min, max, step]) => <label className="preset-field" key={key + String(hoverTurn)}><span>{hoverTurn && key === 'intensity' ? 'Высота парения' : label}</span>
         <input type="number" min={min} max={max} step={step} defaultValue={options[key]}
           onBlur={(event) => {
             const raw = event.currentTarget.valueAsNumber;
@@ -102,7 +108,7 @@ export function PresetLibrary({ emptyScene, canAnimate, canAnimateSelected, prev
       <label className="preset-field"><span>Кривая</span>
         <select value={easing} onChange={(event) => {
           const next = event.currentTarget.value as keyof typeof easingOptions;
-          setEasing(next); setOptions({ ...options, easing: easingOptions[next] });
+          setOptions({ ...options, easing: easingOptions[next] });
         }}>
           <option value="smooth">Мягкая</option><option value="exit">Плавный выход</option>
           <option value="elastic">Упругая</option><option value="linear">Линейная</option>

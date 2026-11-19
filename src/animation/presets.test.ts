@@ -102,3 +102,15 @@ it('rejects motion that would collapse remaining rotation keys onto the final fr
   const project = { ...emptyProject, layers: [layer] };
   expect(applyPreset(project, 'coin', [layer.id], 119, presetDefaults)).toBe(project);
 });
+
+it('hovers before and after one complete turn while keeping the loop closed', () => {
+  const project = applyPreset({ ...emptyProject, layers: [layer] }, 'hoverTurn', [layer.id], 0,
+    { ...presetDefaults, duration: 12, intensity: 0.5, direction: '-x' });
+  const at = (t: number) => evaluate(project, t).layers[0];
+  expect(at(2).position[1]).toBeGreaterThan(at(0).position[1]);
+  expect(at(2).rotation).toEqual(layer.rotation);
+  expect(at(6).rotation[0]).toBeCloseTo(-Math.PI);
+  expect(at(10).rotation[0]).toBeCloseTo(-2 * Math.PI);
+  expect(at(10).position[1]).toBeGreaterThan(at(12).position[1]);
+  expect(isSeamless(project)).toBe(true);
+});

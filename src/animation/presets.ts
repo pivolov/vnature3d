@@ -43,6 +43,10 @@ export const presets = {
   assemble: { label: 'Сборка', group: 'Вход', recipe: { radial: pulse(2.1, 0), scale: pulse(0.55, 1) } },
   explode: { label: 'Разлёт', group: 'Выход', recipe: { radial: pulse(0, 2.3), rotation: pulse(0, 70) } },
   zoom: { label: 'Приближение насквозь', group: 'Выход', recipe: { scale: [[0, 1], [0.65, 1.3], [1, 3]] } },
+  hoverTurn: { label: 'Парение с оборотом', group: 'Цикл', recipe: {
+    position: pulse(0, 0.11, 0, 0.11, 0, 0.11, 0),
+    rotation: [[0, 0], [0.25, 0], [0.75, 360], [1, 360]],
+  } },
   float: { label: 'Парение', group: 'Цикл', recipe: { position: pulse(0, 0.14, 0, -0.14, 0) } },
   spin: { label: 'Оборот 360°', group: 'Цикл', recipe: { rotation: pulse(0, 360) } },
   wobble: { label: 'Покачивание', group: 'Цикл', recipe: { rotation: pulse(0, 8, 0, -8, 0) } },
@@ -155,13 +159,13 @@ export function applyPreset(project: Project, id: PresetId, ids: string[], start
       channel(layer.id, property, offset, samples, combine, easing);
     const strength = options.intensity;
     const scale = layer.scale ?? [1, 1, 1];
-    if (recipe.position || recipe.jitter) set('position', (recipe.position ?? recipe.jitter)!, (amount) => toVector(layer.position, axis, amount * sign * strength));
+    if (recipe.position || recipe.jitter) set('position', (recipe.position ?? recipe.jitter)!, (amount) => toVector(layer.position, id === 'hoverTurn' ? 1 : axis, amount * (id === 'hoverTurn' ? 1 : sign) * strength));
     if (recipe.radial) {
       const angle = index * Math.PI * 2 / Math.max(1, layers.length);
       set('position', recipe.radial, (amount) => [layer.position[0] + amount * Math.cos(angle) * sign * strength,
         layer.position[1] + amount * Math.sin(angle) * sign * strength, layer.position[2]]);
     }
-    if (recipe.rotation) set('rotation', recipe.rotation, (amount) => toVector(layer.rotation, axis, amount * sign * unit * strength),
+    if (recipe.rotation) set('rotation', recipe.rotation, (amount) => toVector(layer.rotation, axis, amount * sign * unit * (id === 'hoverTurn' ? 1 : strength)),
       id === 'spin' || id === 'segments' ? linear : options.easing);
     if (recipe.turn) {
       const turns = recipe.turn;
