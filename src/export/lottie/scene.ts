@@ -1,7 +1,7 @@
 import { Camera, Color, Euler, Matrix3, Matrix4, Quaternion, Vector3 } from 'three';
 import { evaluate, positionAt } from '../../animation/timeline';
 import { effectiveLayer } from '../../core/layers';
-import { materials, type Layer, type Project, type Vec2 } from '../../core/project';
+import { defaultLighting, keyDirection, materials, type Layer, type Project, type Vec2 } from '../../core/project';
 import { projection } from '../../render/projectScene';
 import type { LottieOptions } from './model';
 import { round } from './model';
@@ -43,8 +43,10 @@ const illumination = {
 };
 const lights = [new Vector3(3, 5, 5).normalize(), new Vector3(-4, 1, 4).normalize(), new Vector3(1, 3, -5).normalize()];
 const head = new Vector3(0, 0, 1);
-export function flatFill(layer: Layer, normal: Vector3, light: Project['light'], view = head) {
-  const [ambient, a, b, c] = illumination[light];
+export function flatFill(layer: Layer, normal: Vector3, project: Project, view = head) {
+  const [ambient, a, b, c] = illumination[project.light];
+  const settings = project.lighting ?? defaultLighting;
+  const key = project.lighting ? new Vector3(...keyDirection(settings)) : lights[0];
   const base = new Color(layer.color);
   const how = materials[layer.material];
   const roughness = layer.roughness ?? how.roughness;
@@ -52,7 +54,8 @@ export function flatFill(layer: Layer, normal: Vector3, light: Project['light'],
   const reflection = new Vector3(Math.sin(rotation + 0.32), 0.45, Math.cos(rotation + 0.32)).normalize();
   const half = reflection.add(view).normalize();
   const spec = Math.pow(Math.max(0, normal.dot(half)), 6 + 45 * (1 - roughness)) * (0.04 + how.metalness * 0.17 + how.clearcoat * 0.1);
-  const diffuse = ambient + [a, b, c].reduce((sum, amount, index) => sum + Math.max(0, normal.dot(lights[index])) * amount, 0);
+  const diffuse = ambient * settings.fill + a * settings.strength * Math.max(0, normal.dot(key)) +
+    b * settings.fill * Math.max(0, normal.dot(lights[1])) + c * Math.max(0, normal.dot(lights[2]));
   const color = base.multiplyScalar(diffuse * 0.9).addScalar(spec).add(new Color(layer.emissive ?? '#000000')).convertLinearToSRGB();
   const channel = (value: number) => round(Math.round(Math.min(1, Math.max(0, value)) * 40) / 40, 3);
   return [channel(color.r), channel(color.g), channel(color.b)];

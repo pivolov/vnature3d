@@ -2,7 +2,7 @@ import { AmbientLight, BufferGeometry, DirectionalLight, DoubleSide, FrontSide, 
   NeutralToneMapping, OrthographicCamera, PerspectiveCamera, PMREMGenerator, Scene, WebGLRenderer } from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { effectiveLayer } from '../core/layers';
-import { materials, type Layer, type Project } from '../core/project';
+import { defaultLighting, keyDirection, materials, type Layer, type Project } from '../core/project';
 import { extrudeLayer } from '../geometry/extrusion';
 
 const lighting = {
@@ -79,9 +79,11 @@ export function createProjectScene(renderer: WebGLRenderer) {
     meshes,
     update(project: Project) {
       const preset = lighting[project.light];
-      ambient.intensity = preset.ambient;
-      key.intensity = preset.key;
-      fill.intensity = preset.fill;
+      const settings = project.lighting ?? defaultLighting;
+      key.position.set(...keyDirection(settings));
+      ambient.intensity = preset.ambient * settings.fill;
+      key.intensity = preset.key * settings.strength;
+      fill.intensity = preset.fill * settings.fill;
       rim.intensity = preset.rim;
       rim.color.set(preset.tint);
 

@@ -41,6 +41,18 @@ export type Layer = {
 export type CameraPreset = 'studio' | 'front' | 'top' | 'iso';
 export type LightPreset = 'studio' | 'soft' | 'dramatic' | 'neon';
 
+export const defaultLighting = {
+  azimuth: Math.atan2(3, 5) * 180 / Math.PI,
+  elevation: Math.atan2(5, Math.hypot(3, 5)) * 180 / Math.PI,
+  strength: 1, fill: 1,
+};
+
+export function keyDirection(settings: typeof defaultLighting): Vec3 {
+  const yaw = settings.azimuth * Math.PI / 180;
+  const pitch = settings.elevation * Math.PI / 180;
+  return [Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch)];
+}
+
 export type LayerGroup = {
   id: string;
   name: string;
@@ -58,6 +70,7 @@ export type Project = {
   notices: string[];
   timeline?: TimelineData;
   light: LightPreset;
+  lighting?: typeof defaultLighting;
   camera: { preset: CameraPreset; projection: 'perspective' | 'orthographic'; position: Vec3; target: Vec3; zoom: number };
 };
 

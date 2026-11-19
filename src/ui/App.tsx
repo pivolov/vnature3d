@@ -1,6 +1,6 @@
 import {
   Aperture, ArrowDownToLine, ChevronDown, FilePlus2, FolderOpen, Grid2X2, PanelBottom, Pause, Play, Download, Layers3, SlidersHorizontal, Save, Video,
-  Move, Orbit, Redo2, Undo2, Upload, X,
+  Move, Rotate3D, Sun, Orbit, Redo2, Undo2, Upload, X,
 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from 'react';
 import { Timeline } from './Timeline';
@@ -14,7 +14,7 @@ import { effectiveLayer, isDescendant, makeLayer } from '../core/layers';
 import { LayerTree } from './LayerTree';
 import { PrimitiveEditor } from './PrimitiveEditor';
 import { decodeRaster, RasterDialog, type RasterSource } from './RasterDialog';
-import { cameraPositions, emptyProject, materials, type CameraPreset, type Layer, type LightPreset, type Project, type Vec3 } from '../core/project';
+import { defaultLighting, cameraPositions, emptyProject, materials, type CameraPreset, type Layer, type LightPreset, type Project, type Vec3 } from '../core/project';
 import { primitiveShape } from '../geometry/primitives';
 import { demos } from '../geometry/demos';
 import { importSvg, maxSvgBytes } from '../geometry/svg';
@@ -153,7 +153,13 @@ export function App() {
   const [inspect, setInspect] = useState<'layer' | 'scene'>('layer');
   const [exportOpen, setExportOpen] = useState<'video' | 'lottie' | false>(false);
   const [grid, setGrid] = useState(true);
-  const [gizmo, setGizmo] = useState(false);
+  const [gizmo, setGizmo] = useState<'translate' | 'rotate' | false>(false);
+  const [lightDraft, setLightDraft] = useState<typeof defaultLighting | null>(null);
+  const settings = lightDraft ?? project.lighting ?? defaultLighting;
+  function commitLight(value: typeof defaultLighting) {
+    setLightDraft(null);
+    change(current => ({ ...current, lighting: value }));
+  }
   const [error, setError] = useState('');
   const [raster, setRaster] = useState<RasterSource | null>(null);
   const [graphicsError, setGraphicsError] = useState('');
@@ -281,6 +287,7 @@ export function App() {
           if (restored) { setGraphicsError(''); resetGraphics((value) => value + 1); }
           else setGraphicsError('GPU прервал предпросмотр. Редактор попробует восстановить сцену.');
         },
+        rotate: (id, rotation) => actions.current?.layer(id, { rotation }),
         move: (id, position) => actions.current?.layer(id, { position }),
         orbit: (position, target, zoom) => actions.current?.camera({ position, target, zoom }),
       });
@@ -294,8 +301,10 @@ export function App() {
   }, [selectLayer, graphicsRevision]);
 
   useEffect(() => {
-    viewport.current?.update(previewPose || pose, selectedId, grid && viewMode === 'edit', gizmo && !play && !previewPose && viewMode === 'edit');
-  }, [pose, previewPose, selectedId, grid, gizmo, play, viewMode, graphicsRevision]);
+    const scene = previewPose || pose;
+    viewport.current?.update(lightDraft ? { ...scene, lighting: lightDraft } : scene, selectedId, grid && viewMode === 'edit',
+      !play && !previewPose && viewMode === 'edit' && gizmo);
+  }, [pose, previewPose, lightDraft, selectedId, grid, gizmo, play, viewMode, graphicsRevision]);
 
   useEffect(() => {
     function shortcuts(event: KeyboardEvent) {
@@ -519,14 +528,18 @@ export function App() {
         <div className="canvas-header">
           <div className="document"><h1 title={project.name}>{project.name}</h1>{preview && <span className="preview-label">Предпросмотр · {preview.label}</span>}</div>
           <div className="canvas-tools">
+            <IconButton label="Настроить свет" onClick={() => { setInspect('scene'); setMobilePanel('inspector'); }}><Sun size={17} /></IconButton>
+            <IconButton label="Повернуть объект" pressed={gizmo === 'rotate'} disabled={!selected || selected.locked}
+              onClick={() => setGizmo(gizmo === 'rotate' ? false : 'rotate')}><Rotate3D size={17} /></IconButton>
             <IconButton label={timelineVisible ? 'Свернуть таймлайн' : 'Показать таймлайн'} pressed={timelineVisible}
               onClick={() => setTimelineVisible(!timelineVisible)}><PanelBottom size={17} /></IconButton>
             <IconButton label="Дорожки камеры" pressed={cameraTrack} onClick={() => { setCameraTrack(!cameraTrack); setTimelineVisible(true); setInspect('scene'); }}><Video size={17} /></IconButton>
             <IconButton label="Сетка" pressed={grid} onClick={() => setGrid(!grid)}><Grid2X2 size={17} /></IconButton>
-            <IconButton label="Гизмо перемещения" pressed={gizmo} onClick={() => setGizmo(!gizmo)}><Move size={17} /></IconButton>
+            <IconButton label="Гизмо перемещения" pressed={gizmo === 'translate'} onClick={() => setGizmo(gizmo === 'translate' ? false : 'translate')}><Move size={17} /></IconButton>
           </div>
         </div>
         <div className="viewport-host" ref={host} />
+        {viewMode === 'edit' && !graphicsError && project.layers.length > 0 && <div className="orbit-hint">{gizmo === 'rotate' ? 'Тяните кольцо, чтобы повернуть объект' : 'Тяните фон, чтобы осмотреть модель'}</div>}
         {!!frameGuide && !graphicsError && viewMode === 'edit' && <div className="safe-area" aria-hidden="true">
           <div style={{ '--frame-aspect': frameRatios[frameGuide] } as CSSProperties}><i /></div>
         </div>}
@@ -577,6 +590,27 @@ export function App() {
           }}>
             {Object.entries(lights).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select></label>
+          {([
+            ['azimuth', 'Направление света', -180, 180, '°'],
+            ['elevation', 'Высота света', -90, 90, '°'],
+            ['strength', 'Сила света', 0, 300, '%'],
+            ['fill', 'Заполняющий свет', 0, 200, '%'],
+          ] as const).map(([key, label, min, max, unit]) => {
+            const scale = unit === '%' ? 100 : 1;
+            const value = Math.round(settings[key] * scale);
+            return <label key={key} className="light-slider"><span>{label}</span><output>{value}{unit}</output>
+              <input type="range" aria-label={label} min={min} max={max} value={value} aria-valuetext={value + unit}
+                onPointerDown={event => event.currentTarget.setPointerCapture(event.pointerId)}
+                onChange={event => {
+                  const next = { ...settings, [key]: event.currentTarget.valueAsNumber / scale };
+                  setLightDraft(next);
+                }}
+                onPointerUp={() => { if (lightDraft) commitLight(lightDraft); }}
+                onPointerCancel={() => setLightDraft(null)}
+                onKeyUp={() => { if (lightDraft) commitLight(lightDraft); }}
+                onBlur={() => { if (lightDraft) commitLight(lightDraft); }} /></label>;
+          })}
+          <button className="secondary" disabled={!project.lighting} onClick={() => change(current => ({ ...current, lighting: undefined }))}>Сбросить настройки света</button>
           <label className="field"><span>Проекция</span><select value={project.camera.projection} onChange={(event) => {
             const projection = event.target.value as typeof project.camera.projection;
             editCamera({ projection, zoom: 1 });

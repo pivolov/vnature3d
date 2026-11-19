@@ -6,6 +6,7 @@ import { createProjectScene, projection } from './projectScene';
 
 type Callbacks = {
   select: (id: string) => void;
+  rotate: (id: string, rotation: Vec3) => void;
   move: (id: string, position: Vec3) => void;
   graphics: (restored: boolean) => void;
   orbit: (position: Vec3, target: Vec3, zoom: number) => void;
@@ -96,6 +97,11 @@ export function mountViewport(host: HTMLDivElement, callbacks: Callbacks) {
     const object = transform.object;
     if (!object) return;
     const entry = meshes.get(object.name);
+    if (transform.mode === 'rotate') {
+      const rotation: Vec3 = [object.rotation.x, object.rotation.y, object.rotation.z];
+      if (entry && !sameVector(entry.layer.rotation, rotation)) callbacks.rotate(object.name, rotation);
+      return;
+    }
     const position = object.position.toArray();
     if (entry && !sameVector(entry.layer.position, position)) callbacks.move(object.name, position);
   });
@@ -118,7 +124,9 @@ export function mountViewport(host: HTMLDivElement, callbacks: Callbacks) {
   });
 
   return {
-    update(project: Project, selectedId: string | null, showGrid: boolean, showGizmo: boolean) {
+    update(project: Project, selectedId: string | null, showGrid: boolean, mode: 'translate' | 'rotate' | false) {
+      const showGizmo = !!mode;
+      if (mode && mode !== transform.mode) transform.setMode(mode);
       if (lastCamera !== project.camera) {
         lastCamera = project.camera;
         camera = project.camera.projection === 'orthographic' ? orthographic : perspective;

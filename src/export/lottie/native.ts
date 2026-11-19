@@ -48,7 +48,7 @@ export function planarLayers(project: Project, options: LottieOptions, frames: n
         simplifyPath(ring, options.tolerance / pixel).map(([x, y]): Vec2 => [round(x * pixel), round(-y * pixel)]), 'Contour ' + (ringIndex + 1)));
       shapes += paths.length;
       const fillAt = (item: Layer) => {
-        const fill = flatFill(item, normal, project.light);
+        const fill = flatFill(item, normal, project);
         return back ? fill.map((value) => round(value * 0.65, 3)) : fill;
       };
       const shine = !back && layer.material !== 'clay';

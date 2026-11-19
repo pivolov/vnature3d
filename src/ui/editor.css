@@ -488,3 +488,8 @@ button:focus-visible { outline-color: #b8edcf; }
 .preset-search input { flex: 1; min-width: 0; border: 0; background: transparent; color: inherit; height: 32px; }
 .preset-search button { display: grid; place-items: center; width: 27px; height: 27px; background: transparent; border: 0; color: inherit; }
 .preset-search button:hover { color: white; background: #393939; }
+
+.light-slider { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 3px 8px; font-size: 12px; }
+.light-slider output { color: var(--muted); font-variant-numeric: tabular-nums; }
+.light-slider input { grid-column: 1 / -1; width: 100%; margin: 0; accent-color: var(--accent); }
+.orbit-hint { position: absolute; bottom: 54px; left: 12px; padding: 4px 7px; border-radius: 5px; background: #262626d9; color: #ededed; font-size: 11px; pointer-events: none; }

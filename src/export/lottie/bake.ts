@@ -125,7 +125,7 @@ function mergePaint(ordered: Paint[]) {
   return result.reverse();
 }
 
-function projectPaint(faces: Face[], layer: Layer, light: Project['light'], camera: Camera, options: LottieOptions): Paint[] {
+function projectPaint(faces: Face[], layer: Layer, project: Project, camera: Camera, options: LottieOptions): Paint[] {
   const matrix = world(layer);
   const normalMatrix = normalToWorld(matrix);
   const ortho = 'isOrthographicCamera' in camera;
@@ -153,7 +153,7 @@ function projectPaint(faces: Face[], layer: Layer, light: Project['light'], came
       signed += x * ny - nx * y;
     }
     if (Math.abs(signed) < Math.max(0.04, options.tolerance * 0.08)) continue;
-    output.push({ owner: layer.id, index, near, far, rings, rect, opacity: round(layer.opacity * 100), color: flatFill(layer, normal, light, view),
+    output.push({ owner: layer.id, index, near, far, rings, rect, opacity: round(layer.opacity * 100), color: flatFill(layer, normal, project, view),
       depth: -vector.applyMatrix4(camera.matrixWorldInverse).z });
   }
   return output;
@@ -190,7 +190,7 @@ export function bakedLayers(project: Project, options: LottieOptions, frames: nu
         data.geometry = geometryFaces({ ...layer, bevelSegments: reducedBevel, shapes: data.shapes, relief: data.relief });
         data.metric = metric;
       }
-      const projected = projectPaint(data.geometry, layer, pose.light, camera, options);
+      const projected = projectPaint(data.geometry, layer, pose, camera, options);
       all.push(...projected);
       if (all.length > 7000) throw new Error('В кадре слишком много граней. Увеличьте допуск или экспортируйте видео.');
     }
