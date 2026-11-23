@@ -102,11 +102,46 @@ for name, direction, power, size in (
     obj.rotation_euler = (-obj.location).to_track_quat('-Z', 'Y').to_euler()
 
 scene.frame_set(1)
-if __file__ and Path(__file__).is_file():
-    source = Path(__file__)
-    destination = source.with_suffix('.blend')
+source = Path(bpy.path.abspath(globals().get("__file__", "")))
+still = data.get("still")
+if still:
+    scene.cycles.device = 'CPU'
+    scene.cycles.samples = still["samples"]
+    scene.render.resolution_x = still["width"]
+    scene.render.resolution_y = still["height"]
+    scene.render.resolution_percentage = 100
+    scene.render.image_settings.file_format = 'PNG'
+    scene.render.image_settings.color_mode = 'RGBA' if still["transparent"] else 'RGB'
+    scene.render.film_transparent = still["transparent"]
+    if not still["transparent"]:
+        nodes = scene.world.node_tree.nodes
+        links = scene.world.node_tree.links
+        backdrop = nodes.new('ShaderNodeBackground')
+        backdrop.inputs["Color"].default_value = rgba(still["color"])
+        mix = nodes.new('ShaderNodeMixShader')
+        links.new(nodes.new('ShaderNodeLightPath').outputs["Is Camera Ray"], mix.inputs[0])
+        links.new(nodes["Background"].outputs[0], mix.inputs[1])
+        links.new(backdrop.outputs[0], mix.inputs[2])
+        links.new(mix.outputs[0], nodes["World Output"].inputs["Surface"])
+
+def next_output(source, extension):
+    destination = source.with_suffix(extension)
     i = 2
     while destination.exists():
-        destination = source.with_name(f"{source.stem}-{i}.blend")
+        destination = source.with_name(f"{source.stem}-{i}{extension}")
         i += 1
-    bpy.ops.wm.save_as_mainfile(filepath=str(destination.resolve()))
+    return destination.resolve()
+
+if still:
+    if not source.is_file():
+        raise RuntimeError("Open the downloaded .py from disk in Blender's Text Editor and run it again.")
+    scene.render.filepath = str(next_output(source, '.png'))
+    try:
+        bpy.ops.render.render(write_still=True)
+    except RuntimeError as error:
+        if "denoise" not in str(error).lower():
+            raise
+        scene.cycles.use_denoising = False
+        bpy.ops.render.render(write_still=True)
+elif source.is_file():
+    bpy.ops.wm.save_as_mainfile(filepath=str(next_output(source, '.blend')))

@@ -29,6 +29,7 @@ export function ExportDialog({ project, time, close, lottie, onRendering, render
   const [rate, setRate] = useState<keyof typeof quality | 'custom'>('good');
   const [direct, setDirect] = useState(false);
   const [preparingBlender, setPreparingBlender] = useState(false);
+  const [cpuPrepared, setCpuPrepared] = useState(false);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState('');
@@ -55,6 +56,7 @@ export function ExportDialog({ project, time, close, lottie, onRendering, render
     set((current) => ({ ...current, ...patch }));
     setError('');
     setFinished(false);
+    setCpuPrepared(false);
     setResult('');
   }
   async function start() {
@@ -66,6 +68,7 @@ export function ExportDialog({ project, time, close, lottie, onRendering, render
     setError('');
     setRunning(true);
     setFinished(false);
+    setCpuPrepared(false);
     setResult('');
     setProgress({ done: 0, total: plan.frames, detail: 'Подготовка сцены…', eta: 0 });
     progressClock.current = 0;
@@ -188,6 +191,24 @@ export function ExportDialog({ project, time, close, lottie, onRendering, render
         <span>{progress.detail} · {progress.done}/{progress.total}{progress.eta > 1 ? ' · осталось ≈ ' + Math.ceil(progress.eta) + ' с' : ''}</span>
       </div>}
       {(issue || error) && <p className="export-error" role="alert">{issue || error}</p>}
+      {config.format === 'png' && <div>
+        <button className="secondary" type="button" disabled={running || preparingBlender || !!issue} onClick={async () => {
+          setPreparingBlender(true);
+          try {
+            const { downloadBlender } = await import('../export/blender');
+            downloadBlender(project, config.width / config.height, {
+              width: config.width, height: config.height, transparent: config.transparent, color: config.color,
+              samples: config.traceSamples || 16, time,
+            });
+            setCpuPrepared(true);
+          } catch (cause) {
+            setError(cause instanceof Error ? cause.message : 'Не удалось подготовить CPU-рендер.');
+          } finally {
+            setPreparingBlender(false);
+          }
+        }}>Подготовить PNG через Blender (CPU)</button>
+        {cpuPrepared && <p role="status">В Blender 4.2+ откройте скачанный .py через Scripting → Open → Run Script. PNG сохранится рядом с ним.</p>}
+      </div>}
       {result && <div>{video ? <video controls src={result} style={{ width: '100%' }} /> : <img src={result} alt="Готовый кадр" style={{ width: '100%' }} />}
         <a href={result} download={project.name + '.' + formats[config.format].extension}>Сохранить {formats[config.format].label}</a></div>}
       {finished && <p className="export-success" role="status">Файл готов.</p>}
