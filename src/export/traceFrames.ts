@@ -1,4 +1,5 @@
-import { Color, WebGLRenderer } from 'three';
+import { createWebGLRenderer } from '../render/webgl';
+import { Color } from 'three';
 import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { DenoiseMaterial, ProceduralEquirectTexture, WebGLPathTracer } from 'three-gpu-pathtracer';
 import { evaluate } from '../animation/timeline';
@@ -7,7 +8,7 @@ import { createProjectScene, projection } from '../render/projectScene';
 import type { ExportConfig } from './config';
 
 export function traceFrames(project: Project, options: ExportConfig, signal: AbortSignal, progress: (sample: number, canvas: HTMLCanvasElement) => void) {
-  const renderer = new WebGLRenderer({ alpha: true, preserveDrawingBuffer: true });
+  const renderer = createWebGLRenderer({ alpha: true, preserveDrawingBuffer: true });
   try {
     if (!renderer.extensions.has('EXT_color_buffer_float')) throw new Error('Для трассировки нужен WebGL 2 с float-текстурами. Выберите быстрый режим.');
     renderer.setSize(options.width, options.height, false);

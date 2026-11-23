@@ -18,9 +18,9 @@ function sameVector(a: Vec3, b: Vec3) {
 
 let reducedPreview = false;
 
-export function mountViewport(host: HTMLDivElement, callbacks: Callbacks) {
-  const renderer = new WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, reducedPreview ? 1 : 1.5));
+export function mountViewport(host: HTMLDivElement, callbacks: Callbacks, lightweight = false) {
+  const renderer = new WebGLRenderer({ antialias: !lightweight && !reducedPreview, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, lightweight || reducedPreview ? 1 : 1.5));
   renderer.setClearColor(0x666666, 1);
   host.append(renderer.domElement);
   renderer.domElement.setAttribute('aria-label', 'Трёхмерный предпросмотр');

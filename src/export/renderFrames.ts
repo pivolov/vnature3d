@@ -1,4 +1,4 @@
-import { WebGLRenderer } from 'three';
+import { createWebGLRenderer } from '../render/webgl';
 import { evaluate } from '../animation/timeline';
 import type { Project } from '../core/project';
 import { createProjectScene, projection } from '../render/projectScene';
@@ -18,7 +18,7 @@ export function renderFrames(project: Project, options: ExportConfig) {
   canvas.width = options.width;
   canvas.height = options.height;
   const context = canvasContext(canvas, options.format === 'png');
-  const renderer = new WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+  const renderer = createWebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
   const gl = renderer.getContext();
   const viewport = gl.getParameter(gl.MAX_VIEWPORT_DIMS) as Int32Array;
   const limit = Math.min(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) as number, gl.getParameter(gl.MAX_TEXTURE_SIZE) as number);

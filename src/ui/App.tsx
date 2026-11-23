@@ -18,6 +18,7 @@ import { defaultLighting, cameraPositions, isGlass, emptyProject, materials, typ
 import { primitiveShape } from '../geometry/primitives';
 import { demos } from '../geometry/demos';
 import { importSvg, maxSvgBytes } from '../geometry/svg';
+import { FallbackPreview } from './FallbackPreview';
 import { mountViewport } from '../render/viewport';
 
 const LottieDialog = lazy(() => import('./LottieDialog').then((module) => ({ default: module.LottieDialog })));
@@ -293,9 +294,9 @@ export function App() {
         rotate: (id, rotation) => actions.current?.layer(id, { rotation }),
         move: (id, position) => actions.current?.layer(id, { position }),
         orbit: (position, target, zoom) => actions.current?.camera({ position, target, zoom }),
-      });
+      }, graphicsRevision > 0);
     } catch {
-      setGraphicsError('Не удалось запустить WebGL. Проверьте аппаратное ускорение и перезагрузите страницу.');
+      setGraphicsError('Браузер не смог запустить 3D.');
     }
     return () => {
       viewport.current?.dispose();
@@ -554,12 +555,18 @@ export function App() {
         {!!frameGuide && !graphicsError && viewMode === 'edit' && <div className="safe-area" aria-hidden="true">
           <div style={{ '--frame-aspect': frameRatios[frameGuide] } as CSSProperties}><i /></div>
         </div>}
-        {!(previewPose || project).layers.length && !graphicsError && <div className="empty-canvas">
+        {!(previewPose || project).layers.length && <div className="empty-canvas">
           <Upload size={29} />
           <h2>Перетащите SVG, PNG или JPG</h2>
           <button className="secondary" onClick={() => fileField.current?.click()}>Выбрать файл</button>
         </div>}
-        {graphicsError && <div className="empty-canvas" role="alert">{graphicsError}<button className="secondary" onClick={() => resetGraphics(value => value + 1)}>Перезапустить предпросмотр</button></div>}
+        {graphicsError && <>
+          <FallbackPreview project={previewPose || pose} />
+          <div className="viewport-recovery">
+            <span role="status">{graphicsError} Доступен упрощённый вид спереди.</span>
+            <button className="secondary" onClick={() => resetGraphics(value => value + 1)}>Вернуть 3D</button>
+          </div>
+        </>}
         {(error || project.notices.length > 0) && <div className={'notice' + (error ? ' error' : '')} role={error ? 'alert' : 'status'}>
           <div>{error || project.notices.join(' ')}</div>
           {error && <IconButton label="Закрыть сообщение" onClick={() => setError('')}><X size={15} /></IconButton>}

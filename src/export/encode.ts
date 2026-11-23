@@ -1,3 +1,4 @@
+import { WebGLUnavailable } from '../render/webgl';
 import { Muxer, StreamTarget } from 'mp4-muxer';
 import { Zip, ZipPassThrough } from 'fflate';
 import type { Project } from '../core/project';
@@ -192,7 +193,7 @@ export async function exportScene(project: Project, options: ExportConfig, playh
   const plan = framePlan(project, options, playhead);
   let current = 0;
   let lastPreview = -Infinity;
-  const renderer = options.traceSamples
+  const createRenderer = async () => options.traceSamples
     ? (await import('./traceFrames')).traceFrames(project, options, signal, (sample, canvas) => {
       if (preview && sample > 0 && performance.now() - lastPreview >= 250) {
         preview(canvas);
@@ -201,6 +202,13 @@ export async function exportScene(project: Project, options: ExportConfig, playh
       report(current, plan.frames, 'Трассировка · ' + sample + '/' + options.traceSamples + ' сэмплов');
     })
     : renderFrames(project, options);
+  const renderer = await createRenderer().catch(async error => {
+    if (!(error instanceof WebGLUnavailable)) throw error;
+    report(0, plan.frames, 'Повторный запуск WebGL');
+    await wait(350);
+    signal.throwIfAborted();
+    return createRenderer();
+  });
   const draw = (frame: number) => {
     current = frame;
     return renderer.draw(sample => plan.time(frame, sample), options.format === 'png' ? 1 : options.motionSamples);

@@ -499,3 +499,6 @@ button:focus-visible { outline-color: #b8edcf; }
 .frame-render .dialog-actions { align-items: center; justify-content: space-between; }
 .frame-render a { color: var(--text); background: #484848; border-radius: 6px; padding: 8px 12px; }
 .frame-render a:hover { background: #585858; }
+
+.viewport-fallback { position: absolute; inset: 15% 8%; width: 84%; height: 70%; pointer-events: none; z-index: -1; }
+.viewport-recovery { position: absolute; bottom: 60px; left: 12px; right: 12px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 8px 12px; border-radius: 8px; background: #232426; }
