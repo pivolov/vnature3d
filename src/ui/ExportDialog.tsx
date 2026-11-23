@@ -126,7 +126,9 @@ export function ExportDialog({ project, time, close, lottie, onRendering, render
       </div>
       <div className="export-settings">
         <label><span>Движок</span><select value={config.traceSamples || 0} onChange={event => update({ traceSamples: Number(event.target.value), motionSamples: 1, supersample: false })}>
-          <option value={0}>Быстрый · WebGL</option><option value={8}>Трассировка · 8 сэмплов</option><option value={32}>Трассировка · 32 сэмпла</option><option value={128}>Трассировка · 128 сэмплов</option>
+          <option value={0}>Быстрый · WebGL</option><option value={8}>Трассировка · 8 сэмплов</option><option value={32}>Трассировка · 32 сэмпла</option>
+          <option value={48}>Трассировка · 48 сэмплов</option><option value={64}>Трассировка · 64 сэмпла</option>
+          <option value={128}>Трассировка · 128 сэмплов</option>
         </select></label>
         <label><span>Разрешение</span><select value={size} onChange={(event) => {
           const next = event.currentTarget.value as Size;
