@@ -4,8 +4,8 @@ import type { Project } from '../core/project';
 import { createProjectScene, projection } from '../render/projectScene';
 import type { ExportConfig } from './config';
 
-export function canvasContext(canvas: HTMLCanvasElement) {
-  const result = canvas.getContext('2d', { alpha: true });
+export function canvasContext(canvas: HTMLCanvasElement, willReadFrequently = false) {
+  const result = canvas.getContext('2d', { alpha: true, willReadFrequently });
   if (!result) throw new Error('Не удалось создать поверхность для экспорта.');
   return result;
 }
@@ -17,7 +17,7 @@ export function renderFrames(project: Project, options: ExportConfig) {
   const canvas = document.createElement('canvas');
   canvas.width = options.width;
   canvas.height = options.height;
-  const context = canvasContext(canvas);
+  const context = canvasContext(canvas, options.format === 'png');
   const renderer = new WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
   const gl = renderer.getContext();
   const viewport = gl.getParameter(gl.MAX_VIEWPORT_DIMS) as Int32Array;
@@ -62,11 +62,11 @@ export function renderFrames(project: Project, options: ExportConfig) {
           context.globalCompositeOperation = 'source-over';
         }
       },
-      dispose() {
+      dispose(keepCanvas = false) {
         model.dispose();
         renderer.dispose();
         renderer.forceContextLoss();
-        canvas.width = canvas.height = 0;
+        if (!keepCanvas) canvas.width = canvas.height = 0;
         renderer.domElement.width = renderer.domElement.height = 0;
       },
     };

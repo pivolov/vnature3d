@@ -16,7 +16,8 @@ export function traceFrames(project: Project, options: ExportConfig, signal: Abo
     const tracer = new WebGLPathTracer(renderer);
     const filter = new DenoiseMaterial({ sigma: 1.4, kSigma: 2, threshold: 0.14 });
     const quad = new FullScreenQuad(filter);
-    tracer.tiles.set(2, 2);
+    const still = options.format === 'png';
+    tracer.tiles.set(still ? Math.ceil(options.width / 384) : 2, still ? Math.ceil(options.height / 384) : 2);
     tracer.bounces = 5;
     tracer.transmissiveBounces = 8;
     tracer.renderDelay = tracer.minSamples = tracer.fadeDuration = 0;
@@ -35,7 +36,7 @@ export function traceFrames(project: Project, options: ExportConfig, signal: Abo
     const canvas = document.createElement('canvas');
     canvas.width = options.width;
     canvas.height = options.height;
-    const context = canvas.getContext('2d')!;
+    const context = canvas.getContext('2d', { willReadFrequently: still })!;
     return {
       canvas,
       async draw(at: (sample: number) => number) {
@@ -61,8 +62,23 @@ export function traceFrames(project: Project, options: ExportConfig, signal: Abo
         }
         if (!options.transparent || options.format === 'mp4') {
           filter.map = tracer.target.texture;
-          quad.render(renderer);
+          if (still) {
+            const tile = 384;
+            renderer.setScissorTest(true);
+            try {
+              for (let y = 0; y < options.height; y += tile) {
+                for (let x = 0; x < options.width; x += tile) {
+                  signal.throwIfAborted();
+                  if (renderer.getContext().isContextLost()) throw new Error('GPU остановился при шумоподавлении PNG. Уменьшите разрешение.');
+                  renderer.setScissor(x, y, Math.min(tile, options.width - x), Math.min(tile, options.height - y));
+                  quad.render(renderer);
+                  await new Promise(resolve => setTimeout(resolve, 0));
+                }
+              }
+            } finally { renderer.setScissorTest(false); }
+          } else quad.render(renderer);
         }
+        if (renderer.getContext().isContextLost()) throw new Error('GPU остановился перед чтением кадра. Уменьшите разрешение.');
         context.clearRect(0, 0, canvas.width, canvas.height);
         context.drawImage(renderer.domElement, 0, 0);
       },

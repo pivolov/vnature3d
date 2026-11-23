@@ -191,9 +191,13 @@ export async function exportScene(project: Project, options: ExportConfig, playh
   signal.throwIfAborted();
   const plan = framePlan(project, options, playhead);
   let current = 0;
+  let lastPreview = -Infinity;
   const renderer = options.traceSamples
     ? (await import('./traceFrames')).traceFrames(project, options, signal, (sample, canvas) => {
-      if (sample > 0) preview?.(canvas);
+      if (preview && sample > 0 && performance.now() - lastPreview >= 250) {
+        preview(canvas);
+        lastPreview = performance.now();
+      }
       report(current, plan.frames, 'Трассировка · ' + sample + '/' + options.traceSamples + ' сэмплов');
     })
     : renderFrames(project, options);
@@ -201,9 +205,13 @@ export async function exportScene(project: Project, options: ExportConfig, playh
     current = frame;
     return renderer.draw(sample => plan.time(frame, sample), options.format === 'png' ? 1 : options.motionSamples);
   };
+  let released = false;
   try {
     if (options.format === 'png') {
       await draw(0);
+      report(1, 1, 'Сохранение PNG');
+      renderer.dispose(true);
+      released = true;
       const blob = await pngBlob(renderer.canvas);
       signal.throwIfAborted();
       file.append(new Uint8Array(await blob.arrayBuffer()));
@@ -232,6 +240,7 @@ export async function exportScene(project: Project, options: ExportConfig, playh
     signal.throwIfAborted();
     await file.complete();
   } finally {
-    renderer.dispose();
+    if (!released) renderer.dispose();
+    else renderer.canvas.width = renderer.canvas.height = 0;
   }
 }
