@@ -30,7 +30,7 @@ export function renderFrames(project: Project, options: ExportConfig) {
   try {
     renderer.setPixelRatio(1);
     renderer.setSize(width, height, false);
-    renderer.setClearAlpha(0);
+    renderer.setClearColor(options.color, options.transparent && options.format !== 'mp4' ? 0 : 1);
     const model = createProjectScene(renderer);
     const { perspective, orthographic } = projection(width, height);
     context.imageSmoothingQuality = 'high';

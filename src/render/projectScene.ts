@@ -2,7 +2,7 @@ import { AmbientLight, Box3, Vector3, PCFShadowMap, BufferGeometry, DirectionalL
   NeutralToneMapping, OrthographicCamera, PerspectiveCamera, PMREMGenerator, Scene, WebGLRenderer } from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { effectiveLayer } from '../core/layers';
-import { defaultLighting, keyDirection, materials, type Layer, type Project } from '../core/project';
+import { defaultLighting, isGlass, keyDirection, materials, type Layer, type Project } from '../core/project';
 import { extrudeLayer } from '../geometry/extrusion';
 
 const lighting = {
@@ -130,7 +130,7 @@ export function createProjectScene(renderer: WebGLRenderer) {
         }
         if (!previous || previous.layer.material !== layer.material || previous.layer.color !== layer.color ||
           previous.layer.emissive !== layer.emissive || previous.layer.roughness !== layer.roughness ||
-          previous.layer.opacity !== layer.opacity || previous.layer.relief !== layer.relief || previous.layer.shine !== layer.shine) {
+          previous.layer.depth !== layer.depth || previous.layer.opacity !== layer.opacity || previous.layer.relief !== layer.relief || previous.layer.shine !== layer.shine) {
           const { roughness, metalness, clearcoat } = materials[layer.material];
           const side = layer.relief ? DoubleSide : FrontSide;
           const transparent = layer.opacity < 1;
@@ -140,13 +140,14 @@ export function createProjectScene(renderer: WebGLRenderer) {
           mesh.material.envMapIntensity = scene.environmentIntensity;
           mesh.material.envMapRotation.set(0, studioAngle + (layer.shine ?? 0), 0);
           mesh.material.setValues({ color: layer.color, emissive: layer.emissive ?? '#000000',
+            transmission: isGlass(layer.material) ? 1 : 0, ior: 1.5, thickness: isGlass(layer.material) ? layer.depth : 0,
             roughness: layer.roughness ?? roughness, metalness, clearcoat, side, opacity: layer.opacity, transparent, depthWrite: !transparent });
         }
         mesh.position.set(...layer.position);
         mesh.scale.set(...(layer.scale ?? [1, 1, 1]));
         mesh.rotation.set(...layer.rotation);
         mesh.visible = layer.visible;
-        mesh.castShadow = layer.opacity >= 1;
+        mesh.castShadow = layer.opacity >= 1 && !isGlass(layer.material);
         mesh.receiveShadow = true;
         meshes.set(layer.id, { layer, mesh });
       }

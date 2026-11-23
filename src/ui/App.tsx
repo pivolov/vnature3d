@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from 'react';
 import { Timeline } from './Timeline';
+import { FrameRender } from './FrameRender';
 import { ExportDialog } from './ExportDialog';
 import { PresetLibrary, type PresetSelection } from './PresetLibrary';
 import { applyPreset, applyTemplate, presets, templates, type PresetOptions } from '../animation/presets';
@@ -14,7 +15,7 @@ import { effectiveLayer, isDescendant, makeLayer } from '../core/layers';
 import { LayerTree } from './LayerTree';
 import { PrimitiveEditor } from './PrimitiveEditor';
 import { decodeRaster, RasterDialog, type RasterSource } from './RasterDialog';
-import { defaultLighting, cameraPositions, emptyProject, materials, type CameraPreset, type Layer, type LightPreset, type Project, type Vec3 } from '../core/project';
+import { defaultLighting, cameraPositions, isGlass, emptyProject, materials, type CameraPreset, type Layer, type LightPreset, type Project, type Vec3 } from '../core/project';
 import { primitiveShape } from '../geometry/primitives';
 import { demos } from '../geometry/demos';
 import { importSvg, maxSvgBytes } from '../geometry/svg';
@@ -80,7 +81,7 @@ function LayerInspector({ layer, set }: { layer: Layer; set: (patch: Partial<Lay
       <label className="field"><span>Пресет</span><select value={layer.material}
         onChange={(event) => {
           const material = event.target.value as Layer['material'];
-          set({ material, roughness: undefined, ...(material === 'gold' ? { color: '#eec269' } : material === 'chrome' ? { color: '#dfe2e5' } : {}) });
+          set({ material, roughness: materials[material].roughness, ...(isGlass(material) && !isGlass(layer.material) ? { color: '#ffffff' } : material === 'gold' ? { color: '#eec269' } : material === 'chrome' ? { color: '#dfe2e5' } : {}) });
         }}>
         {Object.entries(materials).map(([value, material]) => <option key={value} value={value}>{material.label}</option>)}
       </select></label>
@@ -91,7 +92,7 @@ function LayerInspector({ layer, set }: { layer: Layer; set: (patch: Partial<Lay
           }} key={layer.color + layer.material} />
         <span>{layer.color}</span>
       </span></label>
-      <NumberField label="Шероховатость" value={layer.roughness ?? materials[layer.material].roughness} min={0} max={1}
+      <NumberField label={isGlass(layer.material) ? "Матовость (0–1)" : "Шероховатость"} value={layer.roughness ?? materials[layer.material].roughness} min={0} max={1}
         onCommit={(roughness) => set({ roughness })} />
       <label className="field"><span>Свечение</span><input type="color" key={layer.emissive ?? '#000000'}
         defaultValue={layer.emissive ?? '#000000'} onBlur={(event) => {
@@ -164,6 +165,7 @@ export function App() {
   const [raster, setRaster] = useState<RasterSource | null>(null);
   const [graphicsError, setGraphicsError] = useState('');
   const [graphicsRevision, resetGraphics] = useState(0);
+  const [frame, setFrame] = useState<{ project: Project; time: number; ratio: number } | null>(null);
   const [frameGuide, setFrameGuide] = useState<keyof typeof frameRatios | ''>('');
 
   function seek(value: number) {
@@ -471,6 +473,14 @@ export function App() {
         }} />
       <div className="topbar-end">
         <button className="secondary import-action" aria-label="Импорт" title="Импорт изображения" onClick={() => fileField.current?.click()}><ArrowDownToLine size={16} /><span>Импорт</span></button>
+        <button className="secondary import-action" aria-label="Рендер кадра" title="Отрендерить текущий кадр в PNG" disabled={!!graphicsError || !effectiveLayers.some(layer => layer.visible)}
+          onClick={() => {
+            setPlay(0);
+            setPreview(null);
+            const view = host.current;
+            const ratio = frameGuide ? frameRatios[frameGuide] : view?.clientHeight ? view.clientWidth / view.clientHeight : 16 / 9;
+            setFrame({ project, time: timeRef.current, ratio });
+          }}><Aperture size={16} /><span>Рендер</span></button>
         <button className="primary export-action" aria-label="Экспорт" title="Экспорт сцены" disabled={!effectiveLayers.some(({ visible }) => visible)}
           onClick={() => { setPlay(0); setPreview(null); setExportOpen('video'); }}><Download size={16} /><span>Экспорт</span></button>
       </div>
@@ -636,6 +646,7 @@ export function App() {
       autoKey={autoKey} setAutoKey={setAutoKey} update={updateTimeline} />
     <footer className="statusbar"><span>{storageStatus || 'Локальный проект'}</span>
       <span>{effectiveLayers.filter((layer) => layer.visible).length} / {project.layers.length} видимых слоёв</span></footer>
+    {frame && <FrameRender {...frame} close={() => setFrame(null)} />}
     {exportOpen === 'video' && <ExportDialog project={project} time={time} graphicsAvailable={!graphicsError} close={() => setExportOpen(false)} lottie={() => setExportOpen('lottie')} />}
     {exportOpen === 'lottie' && <Suspense fallback={<div className="lottie-loading" role="status">Загрузка экспорта…</div>}>
       <LottieDialog project={project} time={time} close={() => setExportOpen(false)} video={() => setExportOpen('video')} />

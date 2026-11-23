@@ -19,6 +19,7 @@ function sameVector(a: Vec3, b: Vec3) {
 export function mountViewport(host: HTMLDivElement, callbacks: Callbacks) {
   const renderer = new WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x666666, 1);
   host.append(renderer.domElement);
   renderer.domElement.setAttribute('aria-label', 'Трёхмерный предпросмотр');
   renderer.domElement.setAttribute('role', 'img');

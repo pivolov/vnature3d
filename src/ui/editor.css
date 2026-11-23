@@ -493,3 +493,9 @@ button:focus-visible { outline-color: #b8edcf; }
 .light-slider output { color: var(--muted); font-variant-numeric: tabular-nums; }
 .light-slider input { grid-column: 1 / -1; width: 100%; margin: 0; accent-color: var(--accent); }
 .orbit-hint { position: absolute; bottom: 54px; left: 12px; padding: 4px 7px; border-radius: 5px; background: #262626d9; color: #ededed; font-size: 11px; pointer-events: none; }
+
+.frame-render { width: min(840px, calc(100% - 24px)); }
+.frame-render img { display: block; width: 100%; max-height: 68dvh; object-fit: contain; }
+.frame-render .dialog-actions { align-items: center; justify-content: space-between; }
+.frame-render a { color: var(--text); background: #484848; border-radius: 6px; padding: 8px 12px; }
+.frame-render a:hover { background: #585858; }
