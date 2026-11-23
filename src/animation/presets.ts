@@ -1,9 +1,9 @@
-import { Color, Quaternion, Vector3 } from 'three';
+import { Color, Euler, Quaternion, Vector3 } from 'three';
 import { reduceLinear } from '../utils/reduction';
 import { effectiveLayer } from '../core/layers';
 import { type Layer, type LightPreset, type Project, type Vec3 } from '../core/project';
 import { ease, spring, type Easing } from './easing';
-import { cameraId, defaultTimeline, evaluate, frameTime, type Key, type Property, type TimelineData, type Track, type Value } from './timeline';
+import { cameraId, defaultTimeline, evaluate, frameTime, sampleTrack, type Key, type Property, type TimelineData, type Track, type Value } from './timeline';
 
 export type PresetOptions = {
   duration: number; delay: number; intensity: number; direction: 'x' | 'y' | 'z' | '-x' | '-y' | '-z';
@@ -192,6 +192,32 @@ export function applyPreset(project: Project, id: PresetId, ids: string[], start
       });
       const compact = reduceLinear(samples, ([time]) => time, ([, amount]) => [amount], 0.005 / Math.max(1, strength, ...scale));
       set('scale', compact, (amount) => scale.map((value) => Math.max(0.01, value * (1 + (amount - 1) * 0.48 * strength))) as Vec3, linear);
+    }
+  }
+  if ((id === 'spin' || id === 'hoverTurn') && options.stagger === 0 && layers.length > 1) {
+    const pivot = new Vector3();
+    for (const layer of layers) pivot.add(new Vector3(...layer.position));
+    pivot.divideScalar(layers.length);
+    const channels = new Map(generated.map(track => [track.target + '/' + track.property, track]));
+    for (const layer of layers) {
+      const turn = channels.get(layer.id + '/rotation');
+      if (!turn || turn.keys.length < 2) continue;
+      const movement = channels.get(layer.id + '/position');
+      const first = turn.keys[0].time, last = turn.keys.at(-1)!.time;
+      const frames = Math.round((last - first) * timeline.fps);
+      const offset = new Vector3(...layer.position).sub(pivot);
+      if (offset.lengthSq() < 1e-12) continue;
+      const initial = new Quaternion().setFromEuler(new Euler(...layer.rotation)).invert();
+      const keys = Array.from({ length: frames + 1 }, (_, frame) => {
+        const time = Math.min(last, first + frame / timeline.fps);
+        const rotation = sampleTrack(turn, time) as Vec3;
+        const shift = new Vector3(...(movement ? sampleTrack(movement, time) as Vec3 : layer.position));
+        const orientation = new Quaternion().setFromEuler(new Euler(...rotation)).multiply(initial);
+        const value = offset.clone().applyQuaternion(orientation).sub(offset).add(shift).toArray();
+        return { time, value, easing: linear };
+      });
+      if (movement) movement.keys = keys;
+      else generated.push({ target: layer.id, property: 'position', keys });
     }
   }
   const tracks = new Map(timeline.tracks.map((track) => [track.target + '/' + track.property, track]));

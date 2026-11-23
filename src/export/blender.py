@@ -44,7 +44,9 @@ for layer in data["layers"]:
     shader = material.node_tree.nodes.get("Principled BSDF")
     shader.inputs["Metallic"].default_value = layer["metalness"]
     shader.inputs["Coat Weight"].default_value = layer["coat"]
-    shader.inputs["Transmission Weight"].default_value = float(layer["glass"])
+    shader.inputs["Transmission Weight"].default_value = layer["transmission"]
+    shader.inputs["IOR"].default_value = layer["ior"]
+    shader.inputs["Specular IOR Level"].default_value = layer["specular"] * 0.5
     previous = None
     for frame, pose in enumerate(layer["frames"], 1):
         obj.location = pose["position"]

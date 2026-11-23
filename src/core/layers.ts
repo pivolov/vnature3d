@@ -1,4 +1,4 @@
-import type { Layer, LayerGroup, Project, Shape } from './project';
+import type { Layer, LayerGroup, Project, Shape, Vec3 } from './project';
 
 export type TreeItem = { kind: 'layer'; node: Layer } | { kind: 'group'; node: LayerGroup };
 
@@ -108,4 +108,29 @@ export function makeLayer(name: string, shapes: Shape[], color: string): Layer {
     id: crypto.randomUUID(), name, shapes, color, material: 'clay', opacity: 1, visible: true,
     depth: 0.55, bevel: 0.045, bevelSegments: 6, position: [0, 0, 0], rotation: [0, 0, 0],
   };
+}
+
+export function placeDetailsOnFront(project: Project, baseId: string): Project {
+  const base = project.layers.find(layer => layer.id === baseId);
+  if (!base) return project;
+  const halfDepth = (layer: Layer) => (layer.depth / 2 + layer.bevel) * Math.abs(layer.scale?.[2] ?? 1);
+  const z = base.position[2] + halfDepth(base);
+  const offsets = new Map<string, number>();
+  const layers = project.layers.map(layer => {
+    const state = effectiveLayer(project, layer);
+    if (layer.id === baseId || layer.parentId !== base.parentId || !state.visible || state.locked) return layer;
+    const shift = Math.max(0, z + halfDepth(layer) + 0.002 - layer.position[2]);
+    if (!shift) return layer;
+    offsets.set(layer.id, shift);
+    return { ...layer, position: [layer.position[0], layer.position[1], layer.position[2] + shift] as Vec3 };
+  });
+  const timeline = project.timeline && { ...project.timeline, tracks: project.timeline.tracks.map(track => {
+    const shift = offsets.get(track.target);
+    if (track.property !== 'position' || !shift) return track;
+    return { ...track, keys: track.keys.map(key => {
+      const [x, y, z] = key.value as Vec3;
+      return { ...key, value: [x, y, z + shift] as Vec3 };
+    }) };
+  }) };
+  return offsets.size ? { ...project, layers, timeline } : project;
 }

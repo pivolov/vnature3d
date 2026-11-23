@@ -34,14 +34,15 @@ export function downloadBlender(project: Project, aspect: number) {
     }
     geometry.dispose();
     const preset = materials[layer.material];
-    return { name: layer.name, vertices, faces, normals: loopNormals, metalness: preset.metalness,
-      coat: preset.clearcoat, glass: isGlass(layer.material),
+    return { name: layer.name, vertices, faces, normals: loopNormals, metalness: layer.metalness ?? preset.metalness,
+      coat: layer.clearcoat ?? preset.clearcoat, transmission: isGlass(layer.material) ? layer.transmission ?? 1 : 0,
+      ior: layer.ior ?? 1.5, specular: layer.specularIntensity ?? (isGlass(layer.material) ? 0.5 : 1),
       frames: poses.map(pose => {
         const item = pose.layers[index]?.id === layer.id ? pose.layers[index] : pose.layers.find(candidate => candidate.id === layer.id)!;
         const q = new Quaternion().setFromEuler(new Euler(...item.rotation));
         return { position: [item.position[0], -item.position[2], item.position[1]], rotation: [q.w, q.x, -q.z, q.y],
           scale: [item.scale?.[0] ?? 1, item.scale?.[2] ?? 1, item.scale?.[1] ?? 1],
-          roughness: item.roughness ?? preset.roughness, color: item.color, opacity: item.opacity, emissive: item.emissive ?? '#000000' };
+          roughness: Math.max(isGlass(layer.material) ? 0.06 : 0, item.roughness ?? preset.roughness), color: item.color, opacity: item.opacity, emissive: item.emissive ?? '#000000' };
       }) };
   });
   const lights = { ...defaultLighting, ...project.lighting };

@@ -20,6 +20,10 @@ const layer = node.extend({
   opacity: num.min(0).max(1), depth: num.min(0.001).max(5), bevel: num.min(0).max(0.35),
   bevelSegments: num.int().min(1).max(8), position: vec3, rotation: vec3, scale: vec3.optional(),
   emissive: color.optional(), shine: num.optional(), roughness: num.min(0).max(1).optional(),
+  solid: z.literal('sphere').optional(),
+  metalness: num.min(0).max(1).optional(), clearcoat: num.min(0).max(1).optional(),
+  specularIntensity: num.min(0).max(1).optional(), transmission: num.min(0).max(1).optional(),
+  ior: num.min(1).max(2.5).optional(), opticalThickness: num.min(0).max(5).optional(),
 }).refine(({ shapes, relief }) => !!shapes.length || !!relief);
 const easing = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('linear') }), z.object({ kind: z.literal('hold') }),

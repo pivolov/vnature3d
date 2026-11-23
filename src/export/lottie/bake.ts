@@ -25,7 +25,7 @@ function geometryFaces(layer: Layer) {
   try {
     const positions = geometry.getAttribute('position');
     const vertex = (i: number) => new Vector3(positions.getX(i), positions.getY(i), positions.getZ(i));
-    if (layer.relief) {
+    if (layer.relief || layer.solid) {
       const index = geometry.getIndex();
       if (!index) return faces;
       for (let i = 0; i < index.count; i += 3) {

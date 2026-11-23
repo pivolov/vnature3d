@@ -24,12 +24,16 @@ export function PrimitiveEditor({ layers, selected, onAdd, onCombine, onError }:
   const request = useRef(0);
   const addCurrent = useRef(onAdd);
   addCurrent.current = onAdd;
-  const candidates = layers.filter((layer) => layer.id !== selected?.id && !layer.relief && !layer.locked);
+  const candidates = layers.filter((layer) => layer.id !== selected?.id && !layer.relief && !layer.solid && !layer.locked);
   const operand = candidates.find((layer) => layer.id === selectedOperand) ?? candidates[0];
 
   async function add() {
     if (shape !== 'text') {
-      onAdd(makeLayer(primitiveNames[shape], [primitiveShape(shape, sides)], '#96c9dc'));
+      const layer = makeLayer(primitiveNames[shape], [primitiveShape(shape, sides)], '#96c9dc');
+      if (shape === 'sphere') { layer.solid = 'sphere'; layer.depth = 2.3; layer.bevel = 0; }
+      if (shape === 'cube') { layer.depth = 2; layer.bevel = 0; }
+      if (shape === 'disc' || shape === 'plane') { layer.depth = 0.01; layer.bevel = 0; }
+      onAdd(layer);
       return;
     }
     const id = ++request.current;
@@ -93,7 +97,7 @@ export function PrimitiveEditor({ layers, selected, onAdd, onCombine, onError }:
           onClick={() => void add()}>{busy ? 'Подготовка…' : 'Добавить'}</button>
       </div>
     </details>
-    {selected && !selected.locked && !selected.relief && operand && <details className="primitive-panel">
+    {selected && !selected.locked && !selected.relief && !selected.solid && operand && <details className="primitive-panel">
       <summary>Операции с контурами</summary>
       <div className="section-fields">
         <label className="field"><span>Со слоем</span><select value={operand.id} onChange={(event) => setOperand(event.target.value)}>

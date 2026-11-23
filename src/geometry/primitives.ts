@@ -2,16 +2,21 @@ import { difference, intersection, union, type MultiPolygon, type Polygon, type 
 import type { Layer, Shape, Vec2 } from '../core/project';
 import { importSvg } from './svg';
 
-export type Primitive = 'rectangle' | 'circle' | 'polygon' | 'star';
+export type Primitive = 'rectangle' | 'circle' | 'polygon' | 'star' | 'triangle' | 'square' | 'cube' | 'sphere' | 'disc' | 'plane';
 export type BooleanOperation = 'union' | 'difference' | 'intersection';
 
 export const primitiveNames: Record<Primitive, string> = {
+  triangle: 'Треугольник', square: 'Квадрат', cube: 'Куб', sphere: 'Шар',
+  disc: 'Круглая плоскость', plane: 'Квадратная плоскость',
   rectangle: 'Прямоугольник', circle: 'Круг', polygon: 'Многоугольник', star: 'Звезда',
 };
 
 export function primitiveShape(kind: Primitive, sides: number): Shape {
   if (kind === 'rectangle') return { outer: [[-1.2, -0.8], [1.2, -0.8], [1.2, 0.8], [-1.2, 0.8]], holes: [] };
-  const count = kind === 'circle' ? 144 : sides * (kind === 'star' ? 2 : 1);
+  if (kind === 'square' || kind === 'cube' || kind === 'plane') {
+    return { outer: [[-1,-1], [1,-1], [1,1], [-1,1]], holes: [] };
+  }
+  const count = kind === 'triangle' ? 3 : ['circle', 'disc', 'sphere'].includes(kind) ? 144 : sides * (kind === 'star' ? 2 : 1);
   const outer = Array.from({ length: count }, (_, index): Vec2 => {
     const angle = Math.PI / 2 + 2 * Math.PI * index / count;
     const radius = kind === 'star' && index % 2 ? 0.54 : 1.15;
@@ -44,7 +49,7 @@ function polygons(layer: Layer): MultiPolygon {
 }
 
 export function combineShapes(a: Layer, b: Layer, operation: BooleanOperation): Shape[] {
-  if (a.relief || b.relief || [a, b].some(({ rotation }) => rotation[0] || rotation[1])) {
+  if (a.relief || b.relief || a.solid || b.solid || [a, b].some(({ rotation }) => rotation[0] || rotation[1])) {
     throw new Error('Для булевой операции выберите два плоских контура без наклона по X и Y.');
   }
   const result = { union, difference, intersection }[operation](polygons(a), polygons(b));

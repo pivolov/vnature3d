@@ -62,7 +62,7 @@ export function createProjectScene(renderer: WebGLRenderer) {
     const source = layer.relief ?? layer.shapes;
     let pool = sources.get(source);
     if (!pool) { pool = new Map(); sources.set(source, pool); }
-    const key = layer.depth + '/' + layer.bevel + '/' + layer.bevelSegments;
+    const key = (layer.solid ?? '') + '/' + layer.depth + '/' + layer.bevel + '/' + layer.bevelSegments;
     const existing = pool.get(key);
     if (existing) {
       references.get(existing)!.count++;
@@ -122,7 +122,7 @@ export function createProjectScene(renderer: WebGLRenderer) {
         if (!previous) {
           mesh.name = layer.id;
           scene.add(mesh);
-        } else if (previous.layer.shapes !== layer.shapes || previous.layer.relief !== layer.relief || previous.layer.depth !== layer.depth ||
+        } else if (previous.layer.solid !== layer.solid || previous.layer.shapes !== layer.shapes || previous.layer.relief !== layer.relief || previous.layer.depth !== layer.depth ||
           previous.layer.bevel !== layer.bevel || previous.layer.bevelSegments !== layer.bevelSegments) {
           const next = acquire(layer);
           release(mesh.geometry);
@@ -130,6 +130,9 @@ export function createProjectScene(renderer: WebGLRenderer) {
         }
         if (!previous || previous.layer.material !== layer.material || previous.layer.color !== layer.color ||
           previous.layer.emissive !== layer.emissive || previous.layer.roughness !== layer.roughness ||
+          previous.layer.metalness !== layer.metalness || previous.layer.clearcoat !== layer.clearcoat ||
+          previous.layer.specularIntensity !== layer.specularIntensity || previous.layer.ior !== layer.ior ||
+          previous.layer.transmission !== layer.transmission || previous.layer.opticalThickness !== layer.opticalThickness ||
           previous.layer.depth !== layer.depth || previous.layer.opacity !== layer.opacity || previous.layer.relief !== layer.relief || previous.layer.shine !== layer.shine) {
           const { roughness, metalness, clearcoat } = materials[layer.material];
           const side = layer.relief ? DoubleSide : FrontSide;
@@ -140,8 +143,11 @@ export function createProjectScene(renderer: WebGLRenderer) {
           mesh.material.envMapIntensity = scene.environmentIntensity;
           mesh.material.envMapRotation.set(0, studioAngle + (layer.shine ?? 0), 0);
           mesh.material.setValues({ color: layer.color, emissive: layer.emissive ?? '#000000',
-            transmission: isGlass(layer.material) ? 1 : 0, ior: 1.5, thickness: isGlass(layer.material) ? layer.depth : 0,
-            roughness: layer.roughness ?? roughness, metalness, clearcoat, side, opacity: layer.opacity, transparent, depthWrite: !transparent });
+            transmission: isGlass(layer.material) ? layer.transmission ?? 1 : 0,
+            ior: layer.ior ?? 1.5, thickness: isGlass(layer.material) ? layer.opticalThickness ?? layer.depth : 0,
+            specularIntensity: layer.specularIntensity ?? (isGlass(layer.material) ? 0.5 : 1),
+            roughness: isGlass(layer.material) ? Math.max(0.06, layer.roughness ?? roughness) : layer.roughness ?? roughness,
+            metalness: layer.metalness ?? metalness, clearcoat: layer.clearcoat ?? clearcoat, side, opacity: layer.opacity, transparent, depthWrite: !transparent });
         }
         mesh.position.set(...layer.position);
         mesh.scale.set(...(layer.scale ?? [1, 1, 1]));

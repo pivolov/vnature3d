@@ -17,7 +17,7 @@ export function pickMode(project: Project) {
     yRotation ||= Math.abs(y) > 1e-5;
     return !yRotation || Math.abs(z) < Math.PI;
   }
-  if (layers.some((layer) => layer.relief || !checkRotation(layer.rotation))) return 'bake';
+  if (layers.some((layer) => layer.relief || layer.solid || !checkRotation(layer.rotation))) return 'bake';
   for (const track of project.timeline?.tracks ?? []) {
     const layer = selected.get(track.target);
     if (!layer) continue;

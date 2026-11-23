@@ -10,7 +10,7 @@ import { applyPreset, applyTemplate, presets, templates, type PresetOptions } fr
 import { baseValue, cameraId, defaultTimeline, evaluate, frameTime, positionAt, putKey, type Property, type TimelineData } from '../animation/timeline';
 import { downloadProject, readProject, saveProject, validateProject } from '../core/storage';
 import { createEditor } from '../core/editor';
-import { effectiveLayer, isDescendant, makeLayer } from '../core/layers';
+import { effectiveLayer, isDescendant, makeLayer, placeDetailsOnFront } from '../core/layers';
 import { LayerTree } from './LayerTree';
 import { PrimitiveEditor } from './PrimitiveEditor';
 import { decodeRaster, RasterDialog, type RasterSource } from './RasterDialog';
@@ -73,7 +73,7 @@ function LayerInspector({ layer, set }: { layer: Layer; set: (patch: Partial<Lay
   return <>
     <Section title="Геометрия" expanded>
       <NumberField label={layer.relief ? "Высота рельефа" : "Глубина"} value={layer.depth} min={0.01} max={3} step={0.05} onCommit={(depth) => set({ depth })} />
-      {!layer.relief && <><NumberField label="Фаска" value={layer.bevel} min={0} max={0.35} onCommit={(bevel) => set({ bevel })} />
+      {!layer.relief && !layer.solid && <><NumberField label="Фаска" value={layer.bevel} min={0} max={0.35} onCommit={(bevel) => set({ bevel })} />
       <NumberField label="Сегменты фаски" value={layer.bevelSegments} min={1} max={8} step={1}
         onCommit={(bevelSegments) => set({ bevelSegments })} /></>}
     </Section>
@@ -81,7 +81,7 @@ function LayerInspector({ layer, set }: { layer: Layer; set: (patch: Partial<Lay
       <label className="field"><span>Пресет</span><select value={layer.material}
         onChange={(event) => {
           const material = event.target.value as Layer['material'];
-          set({ material, roughness: materials[material].roughness, ...(isGlass(material) && !isGlass(layer.material) ? { color: '#ffffff' } : material === 'gold' ? { color: '#eec269' } : material === 'chrome' ? { color: '#dfe2e5' } : {}) });
+          set({ material, roughness: materials[material].roughness, metalness: undefined, clearcoat: undefined, specularIntensity: undefined, ...(isGlass(material) && !isGlass(layer.material) ? { color: '#ffffff' } : material === 'gold' ? { color: '#eec269' } : material === 'chrome' ? { color: '#dfe2e5' } : {}) });
         }}>
         {Object.entries(materials).map(([value, material]) => <option key={value} value={value}>{material.label}</option>)}
       </select></label>
@@ -94,6 +94,14 @@ function LayerInspector({ layer, set }: { layer: Layer; set: (patch: Partial<Lay
       </span></label>
       <NumberField label={isGlass(layer.material) ? "Матовость (0–1)" : "Шероховатость"} value={layer.roughness ?? materials[layer.material].roughness} min={0} max={1}
         onCommit={(roughness) => set({ roughness })} />
+      <NumberField label="Сила блика" value={layer.specularIntensity ?? (isGlass(layer.material) ? 0.5 : 1)} min={0} max={1} onCommit={specularIntensity => set({ specularIntensity })} />
+      <NumberField label="Металличность" value={layer.metalness ?? materials[layer.material].metalness} min={0} max={1} onCommit={metalness => set({ metalness })} />
+      <NumberField label="Лак" value={layer.clearcoat ?? materials[layer.material].clearcoat} min={0} max={1} onCommit={clearcoat => set({ clearcoat })} />
+      {isGlass(layer.material) && <>
+        <NumberField label="Пропускание света" value={layer.transmission ?? 1} min={0} max={1} onCommit={transmission => set({ transmission })} />
+        <NumberField label="Преломление (IOR)" value={layer.ior ?? 1.5} min={1} max={2.5} onCommit={ior => set({ ior })} />
+        <NumberField label="Оптическая толщина" value={layer.opticalThickness ?? layer.depth} min={0} max={5} onCommit={opticalThickness => set({ opticalThickness })} />
+      </>}
       <label className="field"><span>Свечение</span><input type="color" key={layer.emissive ?? '#000000'}
         defaultValue={layer.emissive ?? '#000000'} onBlur={(event) => {
           if (event.currentTarget.value !== (layer.emissive ?? '#000000')) set({ emissive: event.currentTarget.value });
@@ -601,6 +609,9 @@ export function App() {
         {inspect === 'layer' && !selected && <p className="muted-empty">Выберите объект во вьюпорте или на панели слоёв.</p>}
         {inspect === 'layer' && selected && <div className="inspector-object"><span className="swatch" style={{ background: selected.color }} />{selected.name}</div>}
         {inspect === 'layer' && selected && (selected.locked ? <p className="muted-empty">Слой заблокирован.</p> : <LayerInspector key={selected.id} layer={selected} set={(patch) => editLayer(selected.id, patch)} />)}
+        {inspect === 'layer' && selected && !selected.locked && project.layers.length > 1 &&
+          <button className="secondary" title="Использовать выбранный слой как основание. Сдвигает соседние слои по Z."
+            onClick={() => { setPlay(0); setPreview(null); change(current => placeDetailsOnFront(current, selected.id)); }}>Вынести детали вперёд</button>}
         {inspect === 'layer' && selected && !selected.locked && sceneTimeline.tracks.some(track => track.target === selected.id && track.property === 'opacity') &&
           <button className="secondary" onClick={() => updateTimeline(timeline => ({ ...timeline,
             tracks: timeline.tracks.filter(track => track.target !== selected.id || track.property !== 'opacity'),

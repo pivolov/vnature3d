@@ -114,3 +114,12 @@ it('hovers before and after one complete turn while keeping the loop closed', ()
   expect(at(10).position[1]).toBeGreaterThan(at(12).position[1]);
   expect(isSeamless(project)).toBe(true);
 });
+
+it('carries separated layers around the shared pivot during a synchronized turn', () => {
+  const layers = [{ ...layer, id: 'base', position: [0, 0, 0] as const }, { ...layer, id: 'detail', position: [0, 0, 1] as const }]
+    .map(item => ({ ...item, position: [...item.position] as typeof layer.position }));
+  const result = applyPreset({ ...emptyProject, layers }, 'spin', ['base', 'detail'], 0,
+    { ...presetDefaults, duration: 2, direction: 'y', intensity: 1, delay: 0, stagger: 0 });
+  const [base, detail] = evaluate(result, 1).layers;
+  expect(detail.position[2] - base.position[2]).toBeCloseTo(-1);
+});

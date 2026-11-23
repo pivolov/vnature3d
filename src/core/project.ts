@@ -9,7 +9,7 @@ export type Shape = {
 };
 
 export const materials = {
-  glass: { label: 'Прозрачное стекло', roughness: 0, metalness: 0, clearcoat: 0 },
+  glass: { label: 'Прозрачное стекло', roughness: 0.09, metalness: 0, clearcoat: 0 },
   frosted: { label: 'Матовое стекло', roughness: 0.48, metalness: 0, clearcoat: 0 },
   chrome: { label: 'Полированный хром', roughness: 0.085, metalness: 1, clearcoat: 0.18 },
   ceramic: { label: 'Глазурованная керамика', roughness: 0.38, metalness: 0, clearcoat: 1 },
@@ -37,6 +37,13 @@ export type Layer = {
   scale?: Vec3;
   emissive?: string;
   roughness?: number;
+  solid?: 'sphere';
+  metalness?: number;
+  clearcoat?: number;
+  specularIntensity?: number;
+  transmission?: number;
+  ior?: number;
+  opticalThickness?: number;
   shine?: number;
   visible: boolean;
   depth: number;

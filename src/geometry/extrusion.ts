@@ -1,4 +1,4 @@
-import { ExtrudeGeometry, Path, PlaneGeometry, Shape, Vector3, type BufferGeometry } from 'three';
+import { ExtrudeGeometry, Path, PlaneGeometry, Shape, SphereGeometry, Vector3, type BufferGeometry } from 'three';
 import type { Layer, Vec2 } from '../core/project';
 
 function outline(path: Path, input: Vec2[], clockwise: boolean) {
@@ -44,6 +44,9 @@ function smoothWalls(geometry: BufferGeometry, crease: number) {
 }
 
 export function extrudeLayer(layer: Layer, smooth = true) {
+  if (layer.solid === 'sphere') {
+    return new SphereGeometry(1.15, smooth ? 48 : 16, smooth ? 32 : 10).scale(1, 1, layer.depth / 2.3);
+  }
   if (layer.relief) {
     const { width, height, heights } = layer.relief;
     const scale = 3.8 / Math.max(width, height);
