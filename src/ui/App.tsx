@@ -647,8 +647,14 @@ export function App() {
       autoKey={autoKey} setAutoKey={setAutoKey} update={updateTimeline} />
     <footer className="statusbar"><span>{storageStatus || 'Локальный проект'}</span>
       <span>{effectiveLayers.filter((layer) => layer.visible).length} / {project.layers.length} видимых слоёв</span></footer>
-    {frame && <ExportDialog project={frame.project} time={frame.time} renderRatio={frame.ratio} onRendering={setRendering} close={() => setFrame(null)} lottie={() => { setFrame(null); setExportOpen('lottie'); }} />}
-    {exportOpen === 'video' && <ExportDialog project={project} time={time} onRendering={setRendering} close={() => setExportOpen(false)} lottie={() => setExportOpen('lottie')} />}
+    {frame && <ExportDialog project={frame.project} time={frame.time} renderRatio={frame.ratio} onRendering={setRendering} blender={async () => {
+      const { downloadBlender } = await import('../export/blender');
+      downloadBlender(project, frameGuide ? frameRatios[frameGuide] : 16 / 9);
+    }} close={() => setFrame(null)} lottie={() => { setFrame(null); setExportOpen('lottie'); }} />}
+    {exportOpen === 'video' && <ExportDialog project={project} time={time} onRendering={setRendering} blender={async () => {
+      const { downloadBlender } = await import('../export/blender');
+      downloadBlender(project, frameGuide ? frameRatios[frameGuide] : 16 / 9);
+    }} close={() => setExportOpen(false)} lottie={() => setExportOpen('lottie')} />}
     {exportOpen === 'lottie' && <Suspense fallback={<div className="lottie-loading" role="status">Загрузка экспорта…</div>}>
       <LottieDialog project={project} time={time} close={() => setExportOpen(false)} video={() => setExportOpen('video')} />
     </Suspense>}

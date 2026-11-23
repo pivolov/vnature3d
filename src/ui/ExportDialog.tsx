@@ -19,7 +19,7 @@ function dimensions(size: keyof typeof resolution, ratio: Ratio) {
 }
 const textSize = (bytes: number) => new Intl.NumberFormat('ru', { maximumFractionDigits: 1 }).format(bytes / 1_000_000) + ' МБ';
 
-export function ExportDialog({ project, time, close, lottie, onRendering, renderRatio }: { project: Project; time: number; close: () => void; lottie: () => void; onRendering: (running: boolean) => void; renderRatio?: number }) {
+export function ExportDialog({ project, time, close, lottie, onRendering, renderRatio, blender }: { project: Project; time: number; close: () => void; lottie: () => void; onRendering: (running: boolean) => void; renderRatio?: number; blender: () => Promise<void> }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const job = useRef<AbortController | null>(null);
   const previewCanvas = useRef<HTMLCanvasElement>(null);
@@ -28,6 +28,7 @@ export function ExportDialog({ project, time, close, lottie, onRendering, render
   const [ratio, setRatio] = useState<Ratio>('16:9');
   const [rate, setRate] = useState<keyof typeof quality | 'custom'>('good');
   const [direct, setDirect] = useState(false);
+  const [preparingBlender, setPreparingBlender] = useState(false);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState('');
@@ -109,8 +110,16 @@ export function ExportDialog({ project, time, close, lottie, onRendering, render
       <h2 id="export-title">{renderRatio ? 'Рендер сцены' : 'Экспорт сцены'}</h2><p title={project.name}>{project.name}</p>
     </div><button className="icon-button" aria-label="Закрыть экспорт" onClick={dismiss}><X size={18} /></button></header>
     <div className="lottie-mode-tabs"><button className="text-button" aria-pressed="true">Видео и PNG</button>
-      <button className="text-button" disabled={running} onClick={lottie}>Lottie</button></div>
-    <fieldset disabled={running} className="export-controls">
+      <button className="text-button" disabled={running || preparingBlender} onClick={lottie}>Lottie</button>
+      <button className="text-button" disabled={running || preparingBlender} onClick={async () => {
+        setPreparingBlender(true);
+        setError('');
+        try { await blender(); }
+        catch (cause) { setError(cause instanceof Error ? cause.message : 'Не удалось подготовить сцену Blender.'); }
+        finally { setPreparingBlender(false); }
+      }}>Blender</button></div>
+    <div className="export-meta"><p>Blender скачивает скрипт сцены. Откройте его в Blender 4.2+ через Scripting → Open → Run Script. Файл .blend появится рядом со скриптом.</p></div>
+    <fieldset disabled={running || preparingBlender} className="export-controls">
       <div className="export-formats" aria-label="Формат экспорта">
         {(Object.keys(formats) as ExportFormat[]).map((format) => <button key={format} type="button" aria-pressed={format === config.format}
           onClick={() => update({ format })}>{formats[format].label}</button>)}
@@ -183,7 +192,7 @@ export function ExportDialog({ project, time, close, lottie, onRendering, render
     </div>
     <footer className="export-actions">
       <button className="secondary" type="button" onClick={dismiss}>{running ? 'Отменить экспорт' : 'Закрыть'}</button>
-      <button className="primary" type="button" disabled={running || !!issue} onClick={() => void start()}><Download size={16} /> {renderRatio ? 'Начать рендер' : 'Экспортировать'}</button>
+      <button className="primary" type="button" disabled={running || preparingBlender || !!issue} onClick={() => void start()}><Download size={16} /> {renderRatio ? 'Начать рендер' : 'Экспортировать'}</button>
     </footer>
   </dialog>;
 }
