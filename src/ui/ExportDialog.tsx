@@ -19,7 +19,7 @@ function dimensions(size: keyof typeof resolution, ratio: Ratio) {
 }
 const textSize = (bytes: number) => new Intl.NumberFormat('ru', { maximumFractionDigits: 1 }).format(bytes / 1_000_000) + ' МБ';
 
-export function ExportDialog({ project, time, close, lottie, graphicsAvailable, renderRatio }: { project: Project; time: number; close: () => void; lottie: () => void; graphicsAvailable: boolean; renderRatio?: number }) {
+export function ExportDialog({ project, time, close, lottie, onRendering, renderRatio }: { project: Project; time: number; close: () => void; lottie: () => void; onRendering: (running: boolean) => void; renderRatio?: number }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const job = useRef<AbortController | null>(null);
   const previewCanvas = useRef<HTMLCanvasElement>(null);
@@ -41,7 +41,7 @@ export function ExportDialog({ project, time, close, lottie, graphicsAvailable, 
     bitrate: 10_000_000, transparent: !renderRatio, color: '#666666', supersample: false, motionSamples: 1,
   });
   const plan = framePlan(project, config, time);
-  const issue = graphicsAvailable ? checkExport(config) : 'Для экспорта видео и PNG нужен WebGL 2. Lottie доступен во вкладке рядом.';
+  const issue = checkExport(config);
   const video = config.format === 'mp4' || config.format === 'webm';
   const estimate = video ? config.bitrate / 8 * plan.duration * (config.transparent && config.format === 'webm' ? 1.27 : 1) : null;
 
@@ -72,6 +72,10 @@ export function ExportDialog({ project, time, close, lottie, graphicsAvailable, 
       file = await outputFile(project.name, config.format, direct, renderRatio && config.format !== 'sequence' ? blob => setResult(URL.createObjectURL(blob)) : undefined);
       signal.throwIfAborted();
       const { exportScene } = await import('../export/encode');
+      onRendering(true);
+      // Let React release the preview context before acquiring the export context.
+      await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      signal.throwIfAborted();
       const started = performance.now();
       await exportScene(project, config, time, file, signal, (done, total, detail) => {
         const now = performance.now();
@@ -92,6 +96,7 @@ export function ExportDialog({ project, time, close, lottie, graphicsAvailable, 
     } finally {
       job.current = null;
       setRunning(false);
+      onRendering(false);
     }
   }
   function dismiss() {

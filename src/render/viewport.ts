@@ -16,9 +16,11 @@ function sameVector(a: Vec3, b: Vec3) {
   return a.every((value, i) => Math.abs(value - b[i]) < 1e-6);
 }
 
+let reducedPreview = false;
+
 export function mountViewport(host: HTMLDivElement, callbacks: Callbacks) {
   const renderer = new WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, reducedPreview ? 1 : 1.5));
   renderer.setClearColor(0x666666, 1);
   host.append(renderer.domElement);
   renderer.domElement.setAttribute('aria-label', 'Трёхмерный предпросмотр');
@@ -57,6 +59,7 @@ export function mountViewport(host: HTMLDivElement, callbacks: Callbacks) {
   function onLost(event: Event) {
     event.preventDefault();
     lost = true;
+    reducedPreview = true;
     cancelAnimationFrame(pendingFrame);
     pendingFrame = 0;
     callbacks.graphics(false);

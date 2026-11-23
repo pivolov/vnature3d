@@ -162,6 +162,7 @@ export function App() {
   }
   const [error, setError] = useState('');
   const [raster, setRaster] = useState<RasterSource | null>(null);
+  const [rendering, setRendering] = useState(false);
   const [graphicsError, setGraphicsError] = useState('');
   const [graphicsRevision, resetGraphics] = useState(0);
   const [frame, setFrame] = useState<{ project: Project; time: number; ratio: number } | null>(null);
@@ -280,8 +281,9 @@ export function App() {
   }, [sceneTimeline.duration]);
 
   useEffect(() => {
-    if (!host.current) return;
+    if (!host.current || rendering) return;
     try {
+      setGraphicsError('');
       viewport.current = mountViewport(host.current, {
         select: selectLayer,
         graphics: (restored) => {
@@ -299,13 +301,13 @@ export function App() {
       viewport.current?.dispose();
       viewport.current = null;
     };
-  }, [selectLayer, graphicsRevision]);
+  }, [selectLayer, graphicsRevision, rendering]);
 
   useEffect(() => {
     const scene = previewPose || pose;
     viewport.current?.update(lightDraft ? { ...scene, lighting: lightDraft } : scene, selectedId, grid && viewMode === 'edit',
       !play && !previewPose && viewMode === 'edit' && gizmo);
-  }, [pose, previewPose, lightDraft, selectedId, grid, gizmo, play, viewMode, graphicsRevision]);
+  }, [pose, previewPose, lightDraft, selectedId, grid, gizmo, play, viewMode, graphicsRevision, rendering]);
 
   useEffect(() => {
     function shortcuts(event: KeyboardEvent) {
@@ -472,7 +474,7 @@ export function App() {
         }} />
       <div className="topbar-end">
         <button className="secondary import-action" aria-label="Импорт" title="Импорт изображения" onClick={() => fileField.current?.click()}><ArrowDownToLine size={16} /><span>Импорт</span></button>
-        <button className="secondary import-action" aria-label="Рендер кадра" title="Отрендерить текущий кадр в PNG" disabled={!!graphicsError || !effectiveLayers.some(layer => layer.visible)}
+        <button className="secondary import-action" aria-label="Рендер кадра" title="Отрендерить текущий кадр в PNG" disabled={!effectiveLayers.some(layer => layer.visible)}
           onClick={() => {
             setPlay(0);
             setPreview(null);
@@ -557,7 +559,7 @@ export function App() {
           <h2>Перетащите SVG, PNG или JPG</h2>
           <button className="secondary" onClick={() => fileField.current?.click()}>Выбрать файл</button>
         </div>}
-        {graphicsError && <div className="empty-canvas" role="alert">{graphicsError}</div>}
+        {graphicsError && <div className="empty-canvas" role="alert">{graphicsError}<button className="secondary" onClick={() => resetGraphics(value => value + 1)}>Перезапустить предпросмотр</button></div>}
         {(error || project.notices.length > 0) && <div className={'notice' + (error ? ' error' : '')} role={error ? 'alert' : 'status'}>
           <div>{error || project.notices.join(' ')}</div>
           {error && <IconButton label="Закрыть сообщение" onClick={() => setError('')}><X size={15} /></IconButton>}
@@ -645,8 +647,8 @@ export function App() {
       autoKey={autoKey} setAutoKey={setAutoKey} update={updateTimeline} />
     <footer className="statusbar"><span>{storageStatus || 'Локальный проект'}</span>
       <span>{effectiveLayers.filter((layer) => layer.visible).length} / {project.layers.length} видимых слоёв</span></footer>
-    {frame && <ExportDialog project={frame.project} time={frame.time} renderRatio={frame.ratio} graphicsAvailable={!graphicsError} close={() => setFrame(null)} lottie={() => { setFrame(null); setExportOpen('lottie'); }} />}
-    {exportOpen === 'video' && <ExportDialog project={project} time={time} graphicsAvailable={!graphicsError} close={() => setExportOpen(false)} lottie={() => setExportOpen('lottie')} />}
+    {frame && <ExportDialog project={frame.project} time={frame.time} renderRatio={frame.ratio} onRendering={setRendering} close={() => setFrame(null)} lottie={() => { setFrame(null); setExportOpen('lottie'); }} />}
+    {exportOpen === 'video' && <ExportDialog project={project} time={time} onRendering={setRendering} close={() => setExportOpen(false)} lottie={() => setExportOpen('lottie')} />}
     {exportOpen === 'lottie' && <Suspense fallback={<div className="lottie-loading" role="status">Загрузка экспорта…</div>}>
       <LottieDialog project={project} time={time} close={() => setExportOpen(false)} video={() => setExportOpen('video')} />
     </Suspense>}
