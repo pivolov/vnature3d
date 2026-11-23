@@ -8,7 +8,7 @@ const memoryLimit = 256 * 1024 * 1024;
 const picker = () => (window as Window & { showSaveFilePicker?: FilePicker }).showSaveFilePicker;
 export const canSaveDirectly = () => !!picker();
 
-export async function outputFile(name: string, format: ExportFormat, direct: boolean) {
+export async function outputFile(name: string, format: ExportFormat, direct: boolean, preview?: (blob: Blob) => void) {
   const media = formats[format];
   // eslint-disable-next-line no-control-regex -- exclude invalid filename characters from project names
   const filename = (name.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').slice(0, 120) || 'VS3D') + '.' + media.extension;
@@ -44,6 +44,7 @@ export async function outputFile(name: string, format: ExportFormat, direct: boo
       if (file) await file.close();
       else {
         const blob = new Blob(parts, { type: media.type });
+        if (preview) { preview(blob); parts.length = 0; return; }
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;

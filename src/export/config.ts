@@ -11,7 +11,7 @@ export const formats = {
 export type ExportFormat = keyof typeof formats;
 export type ExportConfig = {
   format: ExportFormat; width: number; height: number; fps: 24 | 30 | 60;
-  bitrate: number; transparent: boolean; color: string; supersample: boolean; motionSamples: 1 | 2 | 4 | 8;
+  traceSamples?: number; bitrate: number; transparent: boolean; color: string; supersample: boolean; motionSamples: 1 | 2 | 4 | 8;
 };
 
 export function framePlan(project: Project, options: ExportConfig, playhead: number) {

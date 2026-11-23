@@ -35,7 +35,7 @@ function recorderType(format: ExportConfig['format']) {
   return choices.find((choice) => MediaRecorder.isTypeSupported(choice));
 }
 
-async function encodeVideo(canvas: HTMLCanvasElement, draw: (frame: number) => void, plan: ReturnType<typeof framePlan>, options: ExportConfig,
+async function encodeVideo(canvas: HTMLCanvasElement, draw: (frame: number) => void | Promise<void>, plan: ReturnType<typeof framePlan>, options: ExportConfig,
   file: OutputFile, signal: AbortSignal, report: Progress) {
   const config = await compatible(options);
   const withAlpha = options.format === 'webm' && options.transparent;
@@ -43,7 +43,7 @@ async function encodeVideo(canvas: HTMLCanvasElement, draw: (frame: number) => v
   signal.throwIfAborted();
   if (!config || (withAlpha && !maskConfig)) {
     const type = !withAlpha && recorderType(options.format);
-    if (type) {
+    if (type && !options.traceSamples) {
       report(0, plan.frames, 'Совместимый режим · в реальном времени');
       return recordVideo(canvas, draw, plan, options, type, file, signal, report);
     }
@@ -106,7 +106,7 @@ async function encodeVideo(canvas: HTMLCanvasElement, draw: (frame: number) => v
         await wait(4);
       }
       if (colorChunks.size > 24 || alphaChunks.size > 24) throw new Error('Кодировщики цвета и прозрачности рассинхронизировались.');
-      draw(i);
+      await draw(i);
       const timing = { timestamp: timestamp(i), duration: timestamp(i + 1) - timestamp(i), alpha: 'discard' } as const;
       const keyFrame = i % (options.fps * 2) === 0;
       const frame = new VideoFrame(canvas, timing);
@@ -140,9 +140,9 @@ async function encodeVideo(canvas: HTMLCanvasElement, draw: (frame: number) => v
   }
 }
 
-async function recordVideo(canvas: HTMLCanvasElement, draw: (frame: number) => void, plan: ReturnType<typeof framePlan>, options: ExportConfig,
+async function recordVideo(canvas: HTMLCanvasElement, draw: (frame: number) => void | Promise<void>, plan: ReturnType<typeof framePlan>, options: ExportConfig,
   mimeType: string, file: OutputFile, signal: AbortSignal, report: Progress) {
-  draw(0);
+  await draw(0);
   const stream = canvas.captureStream(0);
   const track = stream.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack;
   let pending = Promise.resolve();
@@ -169,7 +169,7 @@ async function recordVideo(canvas: HTMLCanvasElement, draw: (frame: number) => v
     for (let i = 0; i < plan.frames; i++) {
       signal.throwIfAborted();
       if (failure) throw failure;
-      if (i) draw(i);
+      if (i) await draw(i);
       track.requestFrame();
       report(i + 1, plan.frames, 'Совместимый режим · в реальном времени');
       await wait(Math.max(0, start + (i + 1) * 1000 / options.fps - performance.now()));
@@ -185,16 +185,25 @@ async function recordVideo(canvas: HTMLCanvasElement, draw: (frame: number) => v
   }
 }
 
-export async function exportScene(project: Project, options: ExportConfig, playhead: number, file: OutputFile, signal: AbortSignal, report: Progress) {
+export async function exportScene(project: Project, options: ExportConfig, playhead: number, file: OutputFile, signal: AbortSignal, report: Progress, preview?: (canvas: HTMLCanvasElement) => void) {
   const issue = checkExport(options);
   if (issue) throw new Error(issue);
   signal.throwIfAborted();
   const plan = framePlan(project, options, playhead);
-  const renderer = renderFrames(project, options);
-  const draw = (frame: number) => renderer.draw((sample) => plan.time(frame, sample), options.format === 'png' ? 1 : options.motionSamples);
+  let current = 0;
+  const renderer = options.traceSamples
+    ? (await import('./traceFrames')).traceFrames(project, options, signal, (sample, canvas) => {
+      if (sample > 0) preview?.(canvas);
+      report(current, plan.frames, 'Трассировка · ' + sample + '/' + options.traceSamples + ' сэмплов');
+    })
+    : renderFrames(project, options);
+  const draw = (frame: number) => {
+    current = frame;
+    return renderer.draw(sample => plan.time(frame, sample), options.format === 'png' ? 1 : options.motionSamples);
+  };
   try {
     if (options.format === 'png') {
-      draw(0);
+      await draw(0);
       const blob = await pngBlob(renderer.canvas);
       signal.throwIfAborted();
       file.append(new Uint8Array(await blob.arrayBuffer()));
@@ -205,7 +214,7 @@ export async function exportScene(project: Project, options: ExportConfig, playh
       try {
         for (let i = 0; i < plan.frames; i++) {
           signal.throwIfAborted();
-          draw(i);
+          await draw(i);
           const blob = await pngBlob(renderer.canvas);
           signal.throwIfAborted();
           const entry = new ZipPassThrough('frame-' + String(i + 1).padStart(Math.max(4, String(plan.frames).length), '0') + '.png');

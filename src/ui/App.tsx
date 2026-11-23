@@ -4,7 +4,6 @@ import {
 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from 'react';
 import { Timeline } from './Timeline';
-import { FrameRender } from './FrameRender';
 import { ExportDialog } from './ExportDialog';
 import { PresetLibrary, type PresetSelection } from './PresetLibrary';
 import { applyPreset, applyTemplate, presets, templates, type PresetOptions } from '../animation/presets';
@@ -646,7 +645,7 @@ export function App() {
       autoKey={autoKey} setAutoKey={setAutoKey} update={updateTimeline} />
     <footer className="statusbar"><span>{storageStatus || 'Локальный проект'}</span>
       <span>{effectiveLayers.filter((layer) => layer.visible).length} / {project.layers.length} видимых слоёв</span></footer>
-    {frame && <FrameRender {...frame} close={() => setFrame(null)} />}
+    {frame && <ExportDialog project={frame.project} time={frame.time} renderRatio={frame.ratio} graphicsAvailable={!graphicsError} close={() => setFrame(null)} lottie={() => { setFrame(null); setExportOpen('lottie'); }} />}
     {exportOpen === 'video' && <ExportDialog project={project} time={time} graphicsAvailable={!graphicsError} close={() => setExportOpen(false)} lottie={() => setExportOpen('lottie')} />}
     {exportOpen === 'lottie' && <Suspense fallback={<div className="lottie-loading" role="status">Загрузка экспорта…</div>}>
       <LottieDialog project={project} time={time} close={() => setExportOpen(false)} video={() => setExportOpen('video')} />
