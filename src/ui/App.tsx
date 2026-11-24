@@ -21,6 +21,7 @@ import { importSvg, maxSvgBytes } from '../geometry/svg';
 import { FallbackPreview } from './FallbackPreview';
 import { mountViewport } from '../render/viewport';
 
+const GlbDialog = lazy(() => import('./GlbDialog'));
 const LottieDialog = lazy(() => import('./LottieDialog').then((module) => ({ default: module.LottieDialog })));
 
 const useEditor = createEditor({ ...emptyProject, ...importSvg(demos[0].svg), name: demos[0].name });
@@ -156,6 +157,7 @@ export function App() {
   const viewport = useRef<ReturnType<typeof mountViewport> | null>(null);
   const importSequence = useRef(0);
   const dragDepth = useRef(0);
+  const [glb, setGlb] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
   const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
   const [timelineVisible, setTimelineVisible] = useState(true);
@@ -399,13 +401,14 @@ export function App() {
     const request = ++importSequence.current;
     setError('');
     try {
+      if (/\.glb$/i.test(file.name)) { setPlay(0); setGlb(file); return; }
       if (/\.l3d$/i.test(file.name)) { await openProject(file); return; }
       if (/\.(png|jpe?g)$/i.test(file.name) || ['image/png', 'image/jpeg'].includes(file.type)) {
         const source = await decodeRaster(file);
         if (request === importSequence.current) setRaster(source);
         return;
       }
-      if (!/\.svg$/i.test(file.name) && file.type !== 'image/svg+xml') throw new Error('Выберите файл SVG, PNG или JPG.');
+      if (!/\.svg$/i.test(file.name) && file.type !== 'image/svg+xml') throw new Error('Выберите GLB, L3D, SVG, PNG или JPG.');
       if (file.size > maxSvgBytes) throw new Error('SVG превышает 16 МБ. Упростите исходный файл.');
       const source = await file.text();
       if (request === importSequence.current) loadSource(file.name.replace(/\.svg$/i, ''), source);
@@ -467,22 +470,22 @@ export function App() {
         <button aria-pressed={viewMode === 'edit'} onClick={() => { setViewMode('edit'); setPreview(null); }}>Редактор</button>
         <button aria-pressed={viewMode === 'preview'} onClick={() => { setViewMode('preview'); setMobilePanel(null); setPreview(null); }}>Просмотр</button>
       </div>
-      <input type="file" aria-label="Файл проекта" accept=".l3d" ref={projectField} hidden onChange={(event) => {
+      <input type="file" aria-label="Файл проекта" accept=".l3d,.glb" ref={projectField} hidden onChange={(event) => {
         const file = event.currentTarget.files?.[0]; event.currentTarget.value = '';
-        if (file) void openProject(file);
+        if (file) void loadFile(file);
       }} />
       <div className="mobile-panel-tools">
         <IconButton label="Панель слоёв" pressed={mobilePanel === 'tools'} onClick={() => setMobilePanel(mobilePanel === 'tools' ? null : 'tools')}><Layers3 size={16} /></IconButton>
         <IconButton label="Панель настроек" pressed={mobilePanel === 'inspector'} onClick={() => setMobilePanel(mobilePanel === 'inspector' ? null : 'inspector')}><SlidersHorizontal size={16} /></IconButton>
       </div>
-      <input type="file" aria-label="Выбрать изображение" accept=".svg,.png,.jpg,.jpeg,image/svg+xml,image/png,image/jpeg" ref={fileField} hidden
+      <input type="file" aria-label="Выбрать изображение" accept=".glb,.svg,.png,.jpg,.jpeg,image/svg+xml,image/png,image/jpeg" ref={fileField} hidden
         onChange={(event) => {
           const file = event.currentTarget.files?.[0];
           event.currentTarget.value = '';
           if (file) void loadFile(file);
         }} />
       <div className="topbar-end">
-        <button className="secondary import-action" aria-label="Импорт" title="Импорт изображения" onClick={() => fileField.current?.click()}><ArrowDownToLine size={16} /><span>Импорт</span></button>
+        <button className="secondary import-action" aria-label="Импорт" title="Открыть изображение или модель GLB" onClick={() => fileField.current?.click()}><ArrowDownToLine size={16} /><span>Импорт</span></button>
         <button className="secondary import-action" aria-label="Рендер кадра" title="Отрендерить текущий кадр в PNG" disabled={!effectiveLayers.some(layer => layer.visible)}
           onClick={() => {
             setPlay(0);
@@ -682,6 +685,7 @@ export function App() {
       select(layers[0].id);
       setRaster(null);
     }} />}
-    {dragging && <div className="drop-target"><Upload size={32} />Отпустите изображение для импорта</div>}
+    {glb && <Suspense fallback={null}><GlbDialog file={glb} close={() => setGlb(null)} /></Suspense>}
+    {dragging && <div className="drop-target"><Upload size={32} />Отпустите файл, чтобы открыть</div>}
   </div>;
 }

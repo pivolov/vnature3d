@@ -502,3 +502,8 @@ button:focus-visible { outline-color: #b8edcf; }
 
 .viewport-fallback { position: absolute; inset: 15% 8%; width: 84%; height: 70%; pointer-events: none; z-index: -1; }
 .viewport-recovery { position: absolute; bottom: 60px; left: 12px; right: 12px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 8px 12px; border-radius: 8px; background: #232426; }
+.glb-dialog { width: min(900px, calc(100% - 24px)); }
+.glb-view { height: min(60dvh, 600px); background: #666; position: relative; overflow: hidden; border-radius: 8px; }
+.glb-view p { position: absolute; inset: 0; display: grid; place-content: center; padding: 18px; text-align: center; }
+.glb-view canvas { display: block; touch-action: none; }
+.glb-dialog .dialog-actions { align-items: center; justify-content: space-between; }
