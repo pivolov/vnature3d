@@ -3,16 +3,27 @@ import { defaultTimeline, evaluate, positionAt } from '../animation/timeline';
 import { effectiveLayer } from '../core/layers';
 import { defaultLighting, isGlass, keyDirection, materials, type Project } from '../core/project';
 import { extrudeLayer } from '../geometry/extrusion';
+import { framePlan, type ExportConfig } from './config';
 import template from './blender.py?raw';
 
-type Still = { width: number; height: number; transparent: boolean; color: string; samples: number; time: number };
+type RenderSettings = Pick<ExportConfig, 'width' | 'height' | 'transparent' | 'color'> & { samples: number };
+type BlenderRender = RenderSettings & (
+  { format: 'png'; time: number }
+  | { format: 'mp4' | 'sequence'; fps: ExportConfig['fps'] }
+);
 
-export function downloadBlender(project: Project, aspect: number, still?: Still) {
+export function downloadBlender(project: Project, aspect: number, render?: BlenderRender) {
   const timeline = project.timeline ?? defaultTimeline;
   const span = timeline.duration * (timeline.loop === 'ping-pong' ? 2 : 1);
-  const count = Math.ceil(span * timeline.fps);
-  const times = still ? [still.time] : timeline.tracks.length ? Array.from({ length: count + 1 }, (_, i) =>
-    positionAt(Math.min(span, i / timeline.fps), timeline.duration, timeline.loop === 'ping-pong' ? 'ping-pong' : 'once')) : [0];
+  const animation = render && render.format !== 'png'
+    ? framePlan(project, { ...render, bitrate: 0, supersample: false, motionSamples: 1 }, 0)
+    : undefined;
+  const fps = render && render.format !== 'png' ? render.fps : timeline.fps;
+  const count = render ? animation?.frames ?? 1 : Math.ceil(span * fps);
+  const times = render?.format === 'png' ? [render.time] : timeline.tracks.length
+    ? Array.from({ length: render ? count : count + 1 }, (_, i) => animation?.time(i)
+      ?? positionAt(Math.min(span, i / fps), timeline.duration, timeline.loop === 'ping-pong' ? 'ping-pong' : 'once'))
+    : [0];
   const poses = times.map(time => evaluate(project, time));
   const layers = poses[0].layers.filter(layer => effectiveLayer(project, layer).visible).map((layer, index) => {
     const geometry = extrudeLayer(layer);
@@ -49,7 +60,7 @@ export function downloadBlender(project: Project, aspect: number, still?: Still)
   });
   const lights = { ...defaultLighting, ...project.lighting };
   const [x, y, z] = keyDirection(lights);
-  const data = { still, name: project.name, layers, fps: timeline.fps, count, aspect, lights, key: [x, -z, y],
+  const data = { render, name: project.name, layers, fps, count, aspect, lights, key: [x, -z, y],
     cameras: poses.map(({ camera }) => {
       const position = new Vector3(...camera.position);
       const target = new Vector3(...camera.target);
@@ -60,7 +71,7 @@ export function downloadBlender(project: Project, aspect: number, still?: Still)
   const url = URL.createObjectURL(new Blob([script], { type: 'text/x-python' }));
   const link = document.createElement('a');
   link.href = url;
-  link.download = (project.name.replace(/[^\p{L}\p{N}_-]+/gu, '_').slice(0, 80) || 'VD3D') + (still ? '-CPU-PNG.py' : '.py');
+  link.download = (project.name.replace(/[^\p{L}\p{N}_-]+/gu, '_').slice(0, 80) || 'VD3D') + (render ? '-CPU-' + render.format + '.py' : '.py');
   link.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }

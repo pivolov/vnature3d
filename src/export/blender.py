@@ -103,21 +103,29 @@ for name, direction, power, size in (
 
 scene.frame_set(1)
 source = Path(bpy.path.abspath(globals().get("__file__", "")))
-still = data.get("still")
-if still:
+settings = data.get("render")
+if settings:
     scene.cycles.device = 'CPU'
-    scene.cycles.samples = still["samples"]
-    scene.render.resolution_x = still["width"]
-    scene.render.resolution_y = still["height"]
+    scene.cycles.samples = settings["samples"]
+    scene.render.resolution_x = settings["width"]
+    scene.render.resolution_y = settings["height"]
     scene.render.resolution_percentage = 100
-    scene.render.image_settings.file_format = 'PNG'
-    scene.render.image_settings.color_mode = 'RGBA' if still["transparent"] else 'RGB'
-    scene.render.film_transparent = still["transparent"]
-    if not still["transparent"]:
+    format = settings["format"]
+    transparent = settings["transparent"] and format != 'mp4'
+    scene.render.film_transparent = transparent
+    if format == 'mp4':
+        scene.render.image_settings.file_format = 'FFMPEG'
+        scene.render.ffmpeg.format = 'MPEG4'
+        scene.render.ffmpeg.codec = 'H264'
+        scene.render.ffmpeg.constant_rate_factor = 'HIGH'
+    else:
+        scene.render.image_settings.file_format = 'PNG'
+        scene.render.image_settings.color_mode = 'RGBA' if transparent else 'RGB'
+    if not transparent:
         nodes = scene.world.node_tree.nodes
         links = scene.world.node_tree.links
         backdrop = nodes.new('ShaderNodeBackground')
-        backdrop.inputs["Color"].default_value = rgba(still["color"])
+        backdrop.inputs["Color"].default_value = rgba(settings["color"])
         mix = nodes.new('ShaderNodeMixShader')
         links.new(nodes.new('ShaderNodeLightPath').outputs["Is Camera Ray"], mix.inputs[0])
         links.new(nodes["Background"].outputs[0], mix.inputs[1])
@@ -132,16 +140,24 @@ def next_output(source, extension):
         i += 1
     return destination.resolve()
 
-if still:
+if settings:
     if not source.is_file():
         raise RuntimeError("Open the downloaded .py from disk in Blender's Text Editor and run it again.")
-    scene.render.filepath = str(next_output(source, '.png'))
+    if format == 'png':
+        scene.render.filepath = str(next_output(source, '.png'))
+    elif format == 'mp4':
+        scene.render.filepath = str(next_output(source, '.mp4'))
+    else:
+        folder = next_output(source, '.frames')
+        folder.mkdir()
+        scene.render.filepath = str(folder / 'frame-')
+
     try:
-        bpy.ops.render.render(write_still=True)
+        bpy.ops.render.render(animation=format != 'png', write_still=format == 'png')
     except RuntimeError as error:
-        if "denoise" not in str(error).lower():
+        if "denois" not in str(error).lower():
             raise
         scene.cycles.use_denoising = False
-        bpy.ops.render.render(write_still=True)
+        bpy.ops.render.render(animation=format != 'png', write_still=format == 'png')
 elif source.is_file():
     bpy.ops.wm.save_as_mainfile(filepath=str(next_output(source, '.blend')))

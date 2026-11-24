@@ -45,6 +45,8 @@ export function ExportDialog({ project, time, close, lottie, onRendering, render
   const plan = framePlan(project, config, time);
   const issue = checkExport(config);
   const video = config.format === 'mp4' || config.format === 'webm';
+  const cpuFormat = config.format === 'webm' ? null : config.format;
+  const cpuIssue = cpuFormat && checkExport({ ...config, format: cpuFormat, bitrate: 10_000_000 });
   const estimate = video ? config.bitrate / 8 * plan.duration * (config.transparent && config.format === 'webm' ? 1.27 : 1) : null;
 
   useEffect(() => {
@@ -191,23 +193,27 @@ export function ExportDialog({ project, time, close, lottie, onRendering, render
         <span>{progress.detail} · {progress.done}/{progress.total}{progress.eta > 1 ? ' · осталось ≈ ' + Math.ceil(progress.eta) + ' с' : ''}</span>
       </div>}
       {(issue || error) && <p className="export-error" role="alert">{issue || error}</p>}
-      {config.format === 'png' && <div>
-        <button className="secondary" type="button" disabled={running || preparingBlender || !!issue} onClick={async () => {
+      {cpuFormat && <div>
+        <button className="secondary" type="button" disabled={running || preparingBlender || !!cpuIssue} onClick={async () => {
           setPreparingBlender(true);
+          setError('');
           try {
             const { downloadBlender } = await import('../export/blender');
-            downloadBlender(project, config.width / config.height, {
+            const settings = {
               width: config.width, height: config.height, transparent: config.transparent, color: config.color,
-              samples: config.traceSamples || 16, time,
-            });
+              samples: config.traceSamples || 16,
+            };
+            downloadBlender(project, config.width / config.height, cpuFormat === 'png'
+              ? { ...settings, format: 'png', time } : { ...settings, format: cpuFormat, fps: config.fps });
             setCpuPrepared(true);
           } catch (cause) {
             setError(cause instanceof Error ? cause.message : 'Не удалось подготовить CPU-рендер.');
           } finally {
             setPreparingBlender(false);
           }
-        }}>Подготовить PNG через Blender (CPU)</button>
-        {cpuPrepared && <p role="status">В Blender 4.2+ откройте скачанный .py через Scripting → Open → Run Script. PNG сохранится рядом с ним.</p>}
+        }}>{cpuFormat === 'png' ? 'Подготовить PNG через Blender (CPU)' : 'Рендер анимации в Blender (CPU)'}</button>
+        {cpuFormat === 'sequence' && <p>Blender сохранит PNG-кадры в отдельную папку.</p>}
+        {cpuPrepared && <p role="status">В Blender 4.2+ откройте скачанный .py через Scripting → Open → Run Script. {cpuFormat === 'sequence' ? 'Кадры сохранятся в папку рядом со скриптом.' : (cpuFormat === 'png' ? 'PNG' : 'MP4') + ' сохранится рядом со скриптом.'}</p>}
       </div>}
       {result && <div>{video ? <video controls src={result} style={{ width: '100%' }} /> : <img src={result} alt="Готовый кадр" style={{ width: '100%' }} />}
         <a href={result} download={project.name + '.' + formats[config.format].extension}>Сохранить {formats[config.format].label}</a></div>}
