@@ -96,7 +96,7 @@ export default function GlbDialog({ file, close }: { file: File; close: () => vo
   }, [file]);
   return <dialog className="raster-dialog glb-dialog" ref={dialog} onCancel={close} aria-label="Просмотр GLB">
     <header className="dialog-heading"><h2>Просмотр GLB</h2><span title={file.name}>{file.name}</span></header>
-    <div className="glb-view" ref={host}>{status && <p role="status">{status}</p>}</div>
+    <div className="glb-view"><div ref={host} style={{ width: '100%', height: '100%' }} />{status && <p role="status">{status}</p>}</div>
     <div className="dialog-actions"><span>Потяните для поворота. Колесо или жест двумя пальцами меняет масштаб.</span><button onClick={close}>Закрыть</button></div>
   </dialog>;
 }
