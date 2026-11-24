@@ -1,7 +1,7 @@
 import { Euler, Quaternion, Vector3 } from 'three';
 import { defaultTimeline, evaluate, positionAt } from '../animation/timeline';
 import { effectiveLayer } from '../core/layers';
-import { defaultLighting, glassOptics, isGlass, keyDirection, materials, type Project } from '../core/project';
+import { defaultLighting, isGlass, keyDirection, materials, type Project } from '../core/project';
 import { extrudeLayer } from '../geometry/extrusion';
 import template from './blender.py?raw';
 
@@ -38,7 +38,7 @@ export function downloadBlender(project: Project, aspect: number, still?: Still)
     const preset = materials[layer.material];
     return { name: layer.name, vertices, faces, normals: loopNormals, metalness: layer.metalness ?? preset.metalness,
       coat: layer.clearcoat ?? preset.clearcoat, transmission: isGlass(layer.material) ? layer.transmission ?? 1 : 0,
-      ior: glassOptics(layer).ior, specular: layer.specularIntensity ?? (isGlass(layer.material) ? 0.5 : 1),
+      ior: layer.ior ?? 1.5, specular: layer.specularIntensity ?? (isGlass(layer.material) ? 0.5 : 1),
       frames: poses.map(pose => {
         const item = pose.layers[index]?.id === layer.id ? pose.layers[index] : pose.layers.find(candidate => candidate.id === layer.id)!;
         const q = new Quaternion().setFromEuler(new Euler(...item.rotation));

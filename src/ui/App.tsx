@@ -14,7 +14,7 @@ import { effectiveLayer, isDescendant, makeLayer, placeDetailsOnFront } from '..
 import { LayerTree } from './LayerTree';
 import { PrimitiveEditor } from './PrimitiveEditor';
 import { decodeRaster, RasterDialog, type RasterSource } from './RasterDialog';
-import { defaultLighting, cameraPositions, glassOptics, isGlass, emptyProject, materials, type CameraPreset, type Layer, type LightPreset, type Project, type Vec3 } from '../core/project';
+import { defaultLighting, cameraPositions, isGlass, emptyProject, materials, type CameraPreset, type Layer, type LightPreset, type Project, type Vec3 } from '../core/project';
 import { primitiveShape } from '../geometry/primitives';
 import { demos } from '../geometry/demos';
 import { importSvg, maxSvgBytes } from '../geometry/svg';
@@ -99,8 +99,8 @@ function LayerInspector({ layer, set }: { layer: Layer; set: (patch: Partial<Lay
       <NumberField label="Лак" value={layer.clearcoat ?? materials[layer.material].clearcoat} min={0} max={1} onCommit={clearcoat => set({ clearcoat })} />
       {isGlass(layer.material) && <>
         <NumberField label="Пропускание света" value={layer.transmission ?? 1} min={0} max={1} onCommit={transmission => set({ transmission })} />
-        <NumberField label="Преломление (IOR)" value={glassOptics(layer).ior} min={1} max={2.5} onCommit={ior => set({ ior })} />
-        <NumberField label="Оптическая толщина" value={glassOptics(layer).thickness} min={0} max={5} onCommit={opticalThickness => set({ opticalThickness })} />
+        <NumberField label="Преломление (IOR)" value={layer.ior ?? 1.5} min={1} max={2.5} onCommit={ior => set({ ior })} />
+        <NumberField label="Оптическая толщина" value={layer.opticalThickness ?? layer.depth} min={0} max={5} onCommit={opticalThickness => set({ opticalThickness })} />
       </>}
       <label className="field"><span>Свечение</span><input type="color" key={layer.emissive ?? '#000000'}
         defaultValue={layer.emissive ?? '#000000'} onBlur={(event) => {

@@ -53,11 +53,6 @@ export type Layer = {
   rotation: Vec3;
 };
 
-export function glassOptics(layer: Layer) {
-  const thin = !layer.relief && !layer.solid && layer.depth <= 0.02 && layer.bevel <= 0.01;
-  return { ior: layer.ior ?? (thin ? 1.12 : 1.5), thickness: layer.opticalThickness ?? (thin ? 0 : layer.depth) };
-}
-
 export type CameraPreset = 'studio' | 'front' | 'lean' | 'top' | 'iso';
 export type LightPreset = 'studio' | 'soft' | 'dramatic' | 'neon';
 
