@@ -53,7 +53,12 @@ export type Layer = {
   rotation: Vec3;
 };
 
-export type CameraPreset = 'studio' | 'front' | 'top' | 'iso';
+export function glassOptics(layer: Layer) {
+  const thin = !layer.relief && !layer.solid && layer.depth <= 0.02 && layer.bevel <= 0.01;
+  return { ior: layer.ior ?? (thin ? 1.12 : 1.5), thickness: layer.opticalThickness ?? (thin ? 0 : layer.depth) };
+}
+
+export type CameraPreset = 'studio' | 'front' | 'lean' | 'top' | 'iso';
 export type LightPreset = 'studio' | 'soft' | 'dramatic' | 'neon';
 
 export const defaultLighting = {
@@ -93,6 +98,7 @@ export type Project = {
 export const cameraPositions: Record<CameraPreset, Vec3> = {
   studio: [3.1, 2.4, 7.8],
   front: [0, 0, 8.7],
+  lean: [-3.4, 1.3, 7.9],
   top: [0, 8.7, 0.01],
   iso: [5, 5, 5],
 };
